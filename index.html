@@ -205,11 +205,11 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-1">
-                        <input type="text" id="dim-w-input" value="1.00" placeholder="กว้าง" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
-                        <input type="text" id="dim-l-input" value="1.00" placeholder="ยาว" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
-                        <input type="text" id="dim-h-input" value="0.50" placeholder="สูง/ลึก" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
+                        <input type="text" id="dim-w-input" value="" placeholder="กว้าง (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
+                        <input type="text" id="dim-l-input" value="" placeholder="ยาว (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
+                        <input type="text" id="dim-h-input" value="" placeholder="สูง/ลึก (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
                     </div>
-                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* ขนาด กว้าง x ยาว จะถูกคำนวณอัตโนมัติจากการลากรูปทรง</p>
+                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* หากเว้นว่าง ขนาด กว้าง x ยาว จะคำนวณอัตโนมัติเมื่อเปิดสเกล</p>
                 </div>
             </div>
 
@@ -441,14 +441,15 @@
 
         let bomViewScope = 'current';
 
+        // Presets with optional dimensions
         let tagPresets = [
-            { id: 'p1', name: 'F1', shape: 'circle', color: '#ef4444', w: '1.00', l: '1.00', h: '0.50' },
+            { id: 'p1', name: 'F1', shape: 'circle', color: '#ef4444', w: '', l: '', h: '' },
             { id: 'p2', name: 'F2', shape: 'rectangle', color: '#22c55e', w: '1.20', l: '1.20', h: '0.60' },
             { id: 'p3', name: 'C1', shape: 'circle', color: '#3b82f6', w: '0.30', l: '0.30', h: '3.00' },
-            { id: 'p4', name: 'W1', shape: 'line', color: '#a855f7', w: '0.20', l: '5.00', h: '3.00' }
+            { id: 'p4', name: 'W1', shape: 'line', color: '#a855f7', w: '', l: '', h: '' }
         ];
 
-        let activeTagConfig = { name: 'F1', shape: 'circle', color: '#ef4444', w: '1.00', l: '1.00', h: '0.50' };
+        let activeTagConfig = { name: 'F1', shape: 'circle', color: '#ef4444', w: '', l: '', h: '' };
         let placedTags = [];
         let selectedTagId = null;
 
@@ -598,9 +599,9 @@
 
         function computeShapeMetrics(shape) {
             const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : 100;
-            let realW = parseFloat(shape.w) || 0;
-            let realL = parseFloat(shape.l) || 0;
-            let realH = parseFloat(shape.h) || 0;
+            let realW = shape.w !== undefined && shape.w !== '' ? parseFloat(shape.w) : null;
+            let realL = shape.l !== undefined && shape.l !== '' ? parseFloat(shape.l) : null;
+            let realH = shape.h !== undefined && shape.h !== '' ? parseFloat(shape.h) : null;
             let area = 0;
             let perimeter = 0;
 
@@ -608,24 +609,24 @@
                 const r = shape.radius || 20;
                 const realR = r / ppm;
                 area = Math.PI * Math.pow(realR, 2);
-                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled)) {
+                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realW === null)) {
                     realW = realR * 2;
                     realL = realR * 2;
                 }
             } else if (shape.shape === 'rectangle') {
                 const pxW = Math.abs(shape.x2 - shape.x);
                 const pxH = Math.abs(shape.y2 - shape.y);
-                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled)) {
+                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realW === null)) {
                     realW = pxW / ppm;
                     realL = pxH / ppm;
                 }
-                area = realW * realL;
+                area = (realW || 0) * (realL || 0);
             } else if (shape.shape === 'line') {
                 const lenPx = Math.hypot(shape.x2 - shape.x, shape.y2 - shape.y);
-                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled)) {
+                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realL === null)) {
                     realL = lenPx / ppm;
                 }
-                area = realL * realH;
+                area = (realL || 0) * (realH || 0);
             } else if (shape.shape === 'polygon' && shape.points && shape.points.length > 2) {
                 let pxArea = 0;
                 let pxPerimeter = 0;
@@ -638,19 +639,35 @@
                 }
                 area = Math.abs(pxArea / 2) / (ppm * ppm);
                 perimeter = pxPerimeter / ppm;
-                if (autoCalcFromScale) {
+                if (autoCalcFromScale && realW === null) {
                     realW = Math.sqrt(area);
                     realL = Math.sqrt(area);
                 }
             }
 
             return {
-                w: realW.toFixed(2),
-                l: realL.toFixed(2),
-                h: realH.toFixed(2),
+                w: realW !== null && !isNaN(realW) ? realW.toFixed(2) : '',
+                l: realL !== null && !isNaN(realL) ? realL.toFixed(2) : '',
+                h: realH !== null && !isNaN(realH) ? realH.toFixed(2) : '',
                 area: area,
                 perimeter: perimeter.toFixed(2)
             };
+        }
+
+        function formatDimensionDisplay(w, l, h) {
+            const parts = [];
+            if (w) parts.push(w);
+            if (l) parts.push(l);
+            if (h) parts.push(h);
+            return parts.length > 0 ? parts.join(' x ') : '-';
+        }
+
+        function formatPresetDimensionText(preset) {
+            const parts = [];
+            if (preset.w) parts.push(`ก:${preset.w}m`);
+            if (preset.l) parts.push(`ย:${preset.l}m`);
+            if (preset.h) parts.push(`ส:${preset.h}m`);
+            return parts.length > 0 ? parts.join(' x ') : '';
         }
 
         async function renderPage(num) {
@@ -808,24 +825,19 @@
 
             const deletedPageNum = pageNum;
 
-            // 1. Remove target page item from pagesList array
             pagesList.splice(deletedPageNum - 1, 1);
             totalPages = pagesList.length;
 
-            // 2. Remove all tag markers associated with the deleted page
             placedTags = placedTags.filter(tag => tag.page !== deletedPageNum);
 
-            // 3. Shift page numbers for all tags located on subsequent pages
             placedTags.forEach(tag => {
                 if (tag.page > deletedPageNum) {
                     tag.page -= 1;
                 }
             });
 
-            // 4. Adjust active page pointer if we just deleted the last page
             const targetPage = deletedPageNum > totalPages ? totalPages : deletedPageNum;
 
-            // 5. Re-render active page and update BOM
             await renderPage(targetPage);
             triggerAutoSave();
             showToast(`ลบหน้า ${deletedPageNum} เรียบร้อยแล้ว (เหลือทั้งหมด ${totalPages} หน้า)`, 'success');
@@ -914,7 +926,7 @@
                 ctx.arc(tag.x, tag.y, r, 0, 2 * Math.PI);
                 ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1.0; ctx.stroke();
                 
-                const labelText = `${tag.name} (${metrics.area.toFixed(2)} m²)`;
+                const labelText = `${tag.name}${metrics.area > 0 ? ` (${metrics.area.toFixed(2)} m²)` : ''}`;
                 ctx.font = 'bold 12px Prompt, sans-serif';
                 const textWidth = ctx.measureText(labelText).width;
                 ctx.fillStyle = tag.color;
@@ -929,7 +941,8 @@
                 const w = tag.x2 - tag.x;
                 const h = tag.y2 - tag.y;
                 ctx.globalAlpha = 0.2; ctx.fillRect(tag.x, tag.y, w, h); ctx.globalAlpha = 1.0; ctx.strokeRect(tag.x, tag.y, w, h);
-                const labelText = `${tag.name}: ${metrics.w}m x ${metrics.l}m (${metrics.area.toFixed(2)} m²)`;
+                const dimStr = formatDimensionDisplay(metrics.w, metrics.l, metrics.h);
+                const labelText = `${tag.name}${dimStr !== '-' ? `: ${dimStr}` : ''}${metrics.area > 0 ? ` (${metrics.area.toFixed(2)} m²)` : ''}`;
                 ctx.font = 'bold 11px Prompt, sans-serif';
                 const textWidth = ctx.measureText(labelText).width;
                 ctx.fillStyle = tag.color;
@@ -942,7 +955,7 @@
 
             } else if (tag.shape === 'line') {
                 ctx.beginPath(); ctx.moveTo(tag.x, tag.y); ctx.lineTo(tag.x2, tag.y2); ctx.stroke();
-                const labelText = `${tag.name}: ยาว ${metrics.l}m (${metrics.area.toFixed(2)} m²)`;
+                const labelText = `${tag.name}${metrics.l ? `: ยาว ${metrics.l}m` : ''}${metrics.area > 0 ? ` (${metrics.area.toFixed(2)} m²)` : ''}`;
                 ctx.font = 'bold 11px Prompt, sans-serif';
                 const textWidth = ctx.measureText(labelText).width;
                 const midX = (tag.x + tag.x2) / 2, midY = (tag.y + tag.y2) / 2;
@@ -1130,6 +1143,7 @@
                 tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
                 const shapeIcon = item.shape === 'circle' ? 'fa-circle' : item.shape === 'rectangle' ? 'fa-square' : item.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
                 const shapeText = item.shape === 'circle' ? 'วงกลม' : item.shape === 'rectangle' ? 'สี่เหลี่ยม' : item.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง';
+                const dimStr = formatDimensionDisplay(item.w, item.l, item.h);
 
                 tr.innerHTML = `
                     <td class="py-2.5 font-bold flex items-center gap-1.5">
@@ -1137,8 +1151,8 @@
                         <span>${item.name}</span>
                     </td>
                     <td class="py-2.5 text-slate-600"><i class="fa-regular ${shapeIcon} text-[10px] mr-1"></i>${shapeText}</td>
-                    <td class="py-2.5 font-mono text-[11px] text-slate-600">${item.w} x ${item.l} x ${item.h}</td>
-                    <td class="py-2.5 font-mono text-right font-bold text-slate-800">${item.totalArea.toFixed(2)} m²</td>
+                    <td class="py-2.5 font-mono text-[11px] text-slate-600">${dimStr}</td>
+                    <td class="py-2.5 font-mono text-right font-bold text-slate-800">${item.totalArea > 0 ? `${item.totalArea.toFixed(2)} m²` : '-'}</td>
                     <td class="py-2.5 text-right font-bold text-blue-600 text-sm">${item.count}</td>
                 `;
                 tableBody.appendChild(tr);
@@ -1152,7 +1166,7 @@
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
                         <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.name}</span>
-                        <span class="text-[10px] text-slate-500 truncate">(หน้า ${tag.page} - ${metrics.area.toFixed(2)} m²)</span>
+                        <span class="text-[10px] text-slate-500 truncate">(หน้า ${tag.page}${metrics.area > 0 ? ` - ${metrics.area.toFixed(2)} m²` : ''})</span>
                     </div>
                     <button class="btn-del-tag text-red-500 hover:text-red-700 px-1" data-id="${tag.id}"><i class="fa-solid fa-xmark"></i></button>
                 `;
@@ -1179,7 +1193,9 @@
             tagPresets.forEach(preset => {
                 const btn = document.createElement('div');
                 btn.className = `p-2 rounded-lg border flex items-center justify-between cursor-pointer transition ${activeTagConfig.name === preset.name ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`;
-                const shapeIcon = preset.shape === 'circle' ? 'fa-circle' : preset.shape === 'rectangle' ? 'fa-square' : 'fa-slash';
+                const shapeIcon = preset.shape === 'circle' ? 'fa-circle' : preset.shape === 'rectangle' ? 'fa-square' : preset.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
+                const dimText = formatPresetDimensionText(preset);
+
                 btn.innerHTML = `
                     <div class="flex items-center gap-2">
                         <span class="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm" style="background-color: ${preset.color}"></span>
@@ -1188,7 +1204,7 @@
                                 <span>${preset.name}</span>
                                 <i class="fa-regular ${shapeIcon} text-[10px] text-slate-400"></i>
                             </div>
-                            <div class="text-[10px] text-slate-500 font-mono">${preset.w} x ${preset.l} x ${preset.h} m</div>
+                            ${dimText ? `<div class="text-[10px] text-slate-500 font-mono">${dimText}</div>` : ''}
                         </div>
                     </div>
                     <button class="btn-del-preset text-slate-300 hover:text-red-500 p-1"><i class="fa-solid fa-trash-can text-[11px]"></i></button>
@@ -1216,17 +1232,37 @@
             const hInput = document.getElementById('dim-h-input');
             const prevEl = document.getElementById('active-tag-preview');
 
-            if (tagInput) tagInput.value = activeTagConfig.name;
-            if (colInput) colInput.value = activeTagConfig.color;
-            if (hexInput) hexInput.value = activeTagConfig.color;
-            if (wInput) wInput.value = activeTagConfig.w;
-            if (lInput) lInput.value = activeTagConfig.l;
-            if (hInput) hInput.value = activeTagConfig.h;
+            if (tagInput) tagInput.value = activeTagConfig.name || '';
+            if (colInput) colInput.value = activeTagConfig.color || '#ef4444';
+            if (hexInput) hexInput.value = activeTagConfig.color || '#ef4444';
+            if (wInput) wInput.value = activeTagConfig.w !== undefined ? activeTagConfig.w : '';
+            if (lInput) lInput.value = activeTagConfig.l !== undefined ? activeTagConfig.l : '';
+            if (hInput) hInput.value = activeTagConfig.h !== undefined ? activeTagConfig.h : '';
+            if (prevEl) prevEl.style.backgroundColor = activeTagConfig.color || '#ef4444';
+        }
+
+        function syncActiveTagFromInputs() {
+            const tagInput = document.getElementById('tag-name-input');
+            const colInput = document.getElementById('tag-color-input');
+            const wInput = document.getElementById('dim-w-input');
+            const lInput = document.getElementById('dim-l-input');
+            const hInput = document.getElementById('dim-h-input');
+
+            if (tagInput) activeTagConfig.name = tagInput.value.trim() || 'F1';
+            if (colInput) activeTagConfig.color = colInput.value || '#ef4444';
+            if (wInput) activeTagConfig.w = wInput.value.trim();
+            if (lInput) activeTagConfig.l = lInput.value.trim();
+            if (hInput) activeTagConfig.h = hInput.value.trim();
+
+            const prevEl = document.getElementById('active-tag-preview');
             if (prevEl) prevEl.style.backgroundColor = activeTagConfig.color;
         }
 
         function setTool(toolName) {
             activeTool = toolName;
+            if (['circle', 'rectangle', 'line', 'polygon'].includes(toolName)) {
+                activeTagConfig.shape = toolName;
+            }
             document.querySelectorAll('.tool-btn').forEach(btn => {
                 if (btn.dataset.tool === toolName) {
                     btn.classList.add('active', 'bg-blue-50', 'border-blue-500', 'text-blue-700');
@@ -1302,8 +1338,8 @@
             Object.values(summaryMap).forEach((item, idx) => {
                 excelRows.push({
                     'ลำดับ': idx + 1, 'รหัสแท๊ก': item.name, 'รูปทรง': item.shape,
-                    'ความกว้าง (m)': item.w, 'ความยาว (m)': item.l, 'ความสูง (m)': item.h,
-                    'พื้นที่รวม (m²)': item.totalArea.toFixed(2), 'จำนวน': item.count
+                    'ความกว้าง (m)': item.w || '-', 'ความยาว (m)': item.l || '-', 'ความสูง (m)': item.h || '-',
+                    'พื้นที่รวม (m²)': item.totalArea > 0 ? item.totalArea.toFixed(2) : '-', 'จำนวน': item.count
                 });
             });
 
@@ -1335,7 +1371,7 @@
                 const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
                 if (!summaryMap[key]) {
                     summaryMap[key] = {
-                        name: tag.name, shape: tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : 'เส้นตรง',
+                        name: tag.name, shape: tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
                         w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, count: 0
                     };
                 }
@@ -1345,12 +1381,13 @@
             Object.values(summaryMap).forEach((item, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-slate-200';
+                const dimStr = formatDimensionDisplay(item.w, item.l, item.h);
                 tr.innerHTML = `
                     <td class="p-2 border-r border-slate-200 text-center">${idx + 1}</td>
                     <td class="p-2 border-r border-slate-200 font-bold">${item.name}</td>
                     <td class="p-2 border-r border-slate-200">${item.shape}</td>
-                    <td class="p-2 border-r border-slate-200 font-mono">${item.w} x ${item.l} x ${item.h}</td>
-                    <td class="p-2 border-r border-slate-200 text-right font-mono font-bold">${item.totalArea.toFixed(2)} m²</td>
+                    <td class="p-2 border-r border-slate-200 font-mono">${dimStr}</td>
+                    <td class="p-2 border-r border-slate-200 text-right font-mono font-bold">${item.totalArea > 0 ? `${item.totalArea.toFixed(2)} m²` : '-'}</td>
                     <td class="p-2 text-right font-bold text-blue-600">${item.count}</td>
                 `;
                 printTableBody.appendChild(tr);
@@ -1385,6 +1422,21 @@
 
             document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
 
+            // Input fields sync listeners
+            ['tag-name-input', 'tag-color-input', 'dim-w-input', 'dim-l-input', 'dim-h-input'].forEach(id => {
+                document.getElementById(id)?.addEventListener('input', syncActiveTagFromInputs);
+            });
+            document.getElementById('tag-color-input')?.addEventListener('input', (e) => {
+                const hexEl = document.getElementById('tag-color-hex');
+                if (hexEl) hexEl.value = e.target.value;
+                syncActiveTagFromInputs();
+            });
+            document.getElementById('tag-color-hex')?.addEventListener('change', (e) => {
+                const colEl = document.getElementById('tag-color-input');
+                if (colEl) colEl.value = e.target.value;
+                syncActiveTagFromInputs();
+            });
+
             document.getElementById('tab-bom-current')?.addEventListener('click', () => {
                 bomViewScope = 'current';
                 document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
@@ -1402,13 +1454,33 @@
                 autoCalcFromScale = e.target.checked;
                 const dimHint = document.getElementById('dim-calc-hint');
                 if (dimHint) {
-                    dimHint.textContent = autoCalcFromScale ? '* ขนาด กว้าง x ยาว จะถูกคำนวณอัตโนมัติจากการลากรูปทรง' : '* โหมดกำหนดขนาดเองจากตัวเลขด้านบน';
+                    dimHint.textContent = autoCalcFromScale ? '* หากเว้นว่าง ขนาด กว้าง x ยาว จะคำนวณอัตโนมัติเมื่อเปิดสเกล' : '* โหมดกำหนดขนาดเองจากตัวเลขด้านบน';
                 }
             });
 
+            // FIXED: Add Preset Button reads inputs cleanly without forcing defaults
             document.getElementById('btn-add-preset')?.addEventListener('click', () => {
-                tagPresets.push({ id: 'p_' + Date.now(), ...activeTagConfig });
-                renderPresets(); triggerAutoSave();
+                syncActiveTagFromInputs();
+                let shapeVal = activeTagConfig.shape || activeTool;
+                if (!['circle', 'rectangle', 'line', 'polygon'].includes(shapeVal)) {
+                    shapeVal = 'circle';
+                }
+
+                const newPreset = {
+                    id: 'p_' + Date.now(),
+                    name: activeTagConfig.name,
+                    shape: shapeVal,
+                    color: activeTagConfig.color,
+                    w: activeTagConfig.w,
+                    l: activeTagConfig.l,
+                    h: activeTagConfig.h
+                };
+
+                activeTagConfig = { ...newPreset };
+                tagPresets.push(newPreset);
+                renderPresets();
+                triggerAutoSave();
+                showToast(`เพิ่มแม่แบบ ${newPreset.name} เรียบร้อยแล้ว`, 'success');
             });
 
             document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
