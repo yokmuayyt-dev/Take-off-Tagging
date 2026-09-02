@@ -53,8 +53,22 @@
             </div>
         </div>
 
-        <!-- Document / Project Controls -->
+        <!-- Document / Project Controls & Undo/Redo Buttons -->
         <div class="flex items-center space-x-2">
+            <!-- Undo & Redo Controls -->
+            <div class="flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1">
+                <button id="btn-undo" class="px-2.5 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1" title="ย้อนกลับ (Ctrl+Z)" disabled>
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>ย้อนกลับ</span>
+                </button>
+                <button id="btn-redo" class="px-2.5 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1" title="ทำซ้ำ (Ctrl+Y)" disabled>
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>ทำซ้ำ</span>
+                </button>
+            </div>
+
+            <div class="h-5 w-px bg-slate-700 mx-1"></div>
+
             <button id="btn-save-project" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition flex items-center gap-1.5 shadow-sm">
                 <i class="fa-solid fa-floppy-disk"></i>
                 <span>บันทึกโครงการ (.json)</span>
@@ -73,7 +87,7 @@
                 <input type="file" id="file-input" accept="application/pdf,image/*" class="hidden">
             </label>
 
-            <!-- Page Navigation & Page Insertion/Deletion Controls -->
+            <!-- Page Navigation & Controls -->
             <div id="page-controls" class="hidden flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1">
                 <button id="btn-prev-page" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40" title="หน้าก่อนหน้า">
                     <i class="fa-solid fa-chevron-left"></i>
@@ -127,7 +141,8 @@
                 <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
                     <i class="fa-solid fa-toolbox"></i> เครื่องมือมาร์ก (Drawing Tools)
                 </h2>
-                <div class="grid grid-cols-7 gap-1">
+                <!-- Tools Grid including Count Tool -->
+                <div class="grid grid-cols-4 gap-1">
                     <button data-tool="select" class="tool-btn active bg-blue-50 border-blue-500 text-blue-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลือก/ย้าย">
                         <i class="fa-solid fa-hand-pointer text-xs mb-1"></i>
                         <span>เลือก/ย้าย</span>
@@ -139,6 +154,10 @@
                     <button data-tool="scale" class="tool-btn bg-white border-slate-200 text-amber-600 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="ตั้งสเกลแปลน (Calibrate Scale)">
                         <i class="fa-solid fa-ruler-combined text-xs mb-1"></i>
                         <span>ตั้งสเกล</span>
+                    </button>
+                    <button data-tool="count" class="tool-btn bg-white border-slate-200 text-rose-600 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="นับจำนวน (คลิกบนแปลนเพื่อปักมาร์ก +1 ทันที)">
+                        <i class="fa-solid fa-hashtag text-xs mb-1"></i>
+                        <span>นับจำนวน</span>
                     </button>
                     <button data-tool="circle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="วงกลม">
                         <i class="fa-regular fa-circle text-xs mb-1"></i>
@@ -298,6 +317,7 @@
                             <th class="py-2 font-semibold">รูปทรง</th>
                             <th class="py-2 font-semibold">ขนาด (กxยxส)</th>
                             <th class="py-2 font-semibold text-right">พื้นที่รวม (m²)</th>
+                            <th class="py-2 font-semibold text-right">ปริมาตร (m³)</th>
                             <th class="py-2 font-semibold text-right">จำนวน</th>
                         </tr>
                     </thead>
@@ -319,7 +339,7 @@
         </aside>
     </div>
 
-    <!-- Custom Modal Dialog -->
+    <!-- Modals -->
     <div id="custom-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
             <div class="flex items-center gap-3">
@@ -341,7 +361,7 @@
         </div>
     </div>
 
-    <!-- 2-Page Print Preview Modal -->
+    <!-- Print Preview Modal -->
     <div id="print-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex flex-col items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
@@ -399,6 +419,7 @@
                                     <th class="p-2 border-r border-slate-300 font-bold">รูปทรง</th>
                                     <th class="p-2 border-r border-slate-300 font-bold">ขนาด (กxยxส)</th>
                                     <th class="p-2 border-r border-slate-300 font-bold text-right">พื้นที่รวม (m²)</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold text-right">ปริมาตรรวม (m³)</th>
                                     <th class="p-2 font-bold text-right">จำนวน</th>
                                 </tr>
                             </thead>
@@ -413,19 +434,20 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
 
+    <!-- Application Script -->
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        const DB_NAME = 'StructuralBOMDB_V5';
+        const DB_NAME = 'StructuralBOMDB_V8';
         const DB_VERSION = 1;
         const STORE_NAME = 'projectState';
         let db = null;
 
-        // Active rendering task handle to prevent canvas render collision
+        // Active rendering task handle
         let currentRenderTask = null;
 
         let pdfDoc = null;
-        let pagesList = []; // Stores individual page mapping { pdfPageIndex: Number|null, dataUrl: String|null }
+        let pagesList = []; // Array of { pdfPageIndex: Number|null, dataUrl: String|null }
         let pageNum = 1;
         let totalPages = 1;
         let activeFileName = "blueprint";
@@ -441,17 +463,23 @@
 
         let bomViewScope = 'current';
 
-        // Presets with optional dimensions
+        // Initial Presets
         let tagPresets = [
-            { id: 'p1', name: 'F1', shape: 'circle', color: '#ef4444', w: '', l: '', h: '' },
+            { id: 'p1', name: 'F1', shape: 'count', color: '#ef4444', w: '', l: '', h: '' },
             { id: 'p2', name: 'F2', shape: 'rectangle', color: '#22c55e', w: '1.20', l: '1.20', h: '0.60' },
             { id: 'p3', name: 'C1', shape: 'circle', color: '#3b82f6', w: '0.30', l: '0.30', h: '3.00' },
             { id: 'p4', name: 'W1', shape: 'line', color: '#a855f7', w: '', l: '', h: '' }
         ];
 
-        let activeTagConfig = { name: 'F1', shape: 'circle', color: '#ef4444', w: '', l: '', h: '' };
+        let activeTagConfig = { name: 'F1', shape: 'count', color: '#ef4444', w: '', l: '', h: '' };
         let placedTags = [];
         let selectedTagId = null;
+
+        // Undo / Redo Stacks & Clipboard
+        let undoStack = [];
+        let redoStack = [];
+        let clipboardTag = null;
+        const MAX_HISTORY = 30;
 
         let isDrawing = false;
         let isDraggingTag = false;
@@ -471,6 +499,120 @@
             canvasContainer = document.getElementById('canvas-container');
             canvasWrapper = document.getElementById('canvas-wrapper');
             emptyState = document.getElementById('empty-state');
+        }
+
+        function saveHistory() {
+            const snapshot = {
+                placedTags: JSON.parse(JSON.stringify(placedTags)),
+                totalPages: totalPages,
+                pagesList: JSON.parse(JSON.stringify(pagesList)),
+                pixelsPerMeter: pixelsPerMeter
+            };
+            undoStack.push(snapshot);
+            if (undoStack.length > MAX_HISTORY) undoStack.shift();
+            redoStack = []; // Clear redo stack on new user action
+            updateUndoRedoUI();
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            const currentSnapshot = {
+                placedTags: JSON.parse(JSON.stringify(placedTags)),
+                totalPages: totalPages,
+                pagesList: JSON.parse(JSON.stringify(pagesList)),
+                pixelsPerMeter: pixelsPerMeter
+            };
+            redoStack.push(currentSnapshot);
+
+            const previousState = undoStack.pop();
+            placedTags = previousState.placedTags;
+            totalPages = previousState.totalPages;
+            pagesList = previousState.pagesList;
+            pixelsPerMeter = previousState.pixelsPerMeter;
+
+            if (pageNum > totalPages) pageNum = totalPages;
+
+            updateScaleUIBadges();
+            updateUndoRedoUI();
+            renderPage(pageNum);
+            redrawMarkers();
+            updateBOMSummary();
+            triggerAutoSave();
+            showToast('ย้อนกลับการกระทำแล้ว (Undo)', 'info');
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            const currentSnapshot = {
+                placedTags: JSON.parse(JSON.stringify(placedTags)),
+                totalPages: totalPages,
+                pagesList: JSON.parse(JSON.stringify(pagesList)),
+                pixelsPerMeter: pixelsPerMeter
+            };
+            undoStack.push(currentSnapshot);
+
+            const nextState = redoStack.pop();
+            placedTags = nextState.placedTags;
+            totalPages = nextState.totalPages;
+            pagesList = nextState.pagesList;
+            pixelsPerMeter = nextState.pixelsPerMeter;
+
+            if (pageNum > totalPages) pageNum = totalPages;
+
+            updateScaleUIBadges();
+            updateUndoRedoUI();
+            renderPage(pageNum);
+            redrawMarkers();
+            updateBOMSummary();
+            triggerAutoSave();
+            showToast('ทำซ้ำการกระทำแล้ว (Redo)', 'info');
+        }
+
+        function updateUndoRedoUI() {
+            const btnUndo = document.getElementById('btn-undo');
+            const btnRedo = document.getElementById('btn-redo');
+            if (btnUndo) btnUndo.disabled = undoStack.length === 0;
+            if (btnRedo) btnRedo.disabled = redoStack.length === 0;
+        }
+
+        function copySelectedTag() {
+            if (!selectedTagId) {
+                showToast('กรุณาคลิกเลือกวัตถุมาร์กที่ต้องการคัดลอกก่อน (Ctrl+C)', 'error');
+                return;
+            }
+            const tag = placedTags.find(t => t.id === selectedTagId);
+            if (tag) {
+                clipboardTag = JSON.parse(JSON.stringify(tag));
+                showToast(`คัดลอกมาร์ก [${tag.name}] เรียบร้อยแล้ว`, 'success');
+            }
+        }
+
+        function pasteCopiedTag() {
+            if (!clipboardTag) {
+                showToast('ไม่มีมาร์กในคีย์บอร์ดคลิปบอร์ดสำหรับวาง', 'error');
+                return;
+            }
+            saveHistory();
+
+            const offset = 25;
+            const newTag = JSON.parse(JSON.stringify(clipboardTag));
+            newTag.id = 'tag_' + Date.now();
+            newTag.page = pageNum;
+            newTag.x += offset;
+            newTag.y += offset;
+            newTag.x2 += offset;
+            newTag.y2 += offset;
+
+            if (newTag.points && Array.isArray(newTag.points)) {
+                newTag.points = newTag.points.map(pt => ({ x: pt.x + offset, y: pt.y + offset }));
+            }
+
+            placedTags.push(newTag);
+            selectedTagId = newTag.id;
+            redrawMarkers();
+            updateBOMSummary();
+            triggerAutoSave();
+            showToast(`วางมาร์ก [${newTag.name}] บนหน้านี้เรียบร้อยแล้ว`, 'success');
         }
 
         function initIndexedDB() {
@@ -604,9 +746,16 @@
             let realH = shape.h !== undefined && shape.h !== '' ? parseFloat(shape.h) : null;
             let area = 0;
             let perimeter = 0;
+            let volume = 0;
 
-            if (shape.shape === 'circle') {
-                const r = shape.radius || 20;
+            if (shape.shape === 'count') {
+                if (realW !== null && realL !== null && !isNaN(realW) && !isNaN(realL)) {
+                    area = realW * realL;
+                } else {
+                    area = 0;
+                }
+            } else if (shape.shape === 'circle') {
+                const r = shape.radius || 18;
                 const realR = r / ppm;
                 area = Math.PI * Math.pow(realR, 2);
                 if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realW === null)) {
@@ -645,12 +794,30 @@
                 }
             }
 
+            // Calculate Volume (m³) if height/depth (h) is present
+            if (realH !== null && !isNaN(realH) && realH > 0) {
+                if (shape.shape === 'line') {
+                    if (realW !== null && !isNaN(realW) && realW > 0) {
+                        volume = realW * (realL || 0) * realH;
+                    } else {
+                        volume = 0;
+                    }
+                } else {
+                    if (area > 0) {
+                        volume = area * realH;
+                    } else if (realW !== null && realL !== null && !isNaN(realW) && !isNaN(realL)) {
+                        volume = realW * realL * realH;
+                    }
+                }
+            }
+
             return {
                 w: realW !== null && !isNaN(realW) ? realW.toFixed(2) : '',
                 l: realL !== null && !isNaN(realL) ? realL.toFixed(2) : '',
                 h: realH !== null && !isNaN(realH) ? realH.toFixed(2) : '',
                 area: area,
-                perimeter: perimeter.toFixed(2)
+                perimeter: perimeter.toFixed(2),
+                volume: volume
             };
         }
 
@@ -674,11 +841,16 @@
             if (num < 1 || num > totalPages) return;
             pageNum = num;
 
+            // Safely cancel and await previous render task cleanup before starting a new render
             if (currentRenderTask) {
-                try {
-                    currentRenderTask.cancel();
-                } catch (e) { /* ignore */ }
+                const taskToCancel = currentRenderTask;
                 currentRenderTask = null;
+                try {
+                    taskToCancel.cancel();
+                    await taskToCancel.promise;
+                } catch (e) {
+                    /* ignore cancellation exception */
+                }
             }
 
             const pageItem = pagesList[num - 1];
@@ -709,9 +881,12 @@
                         markerCanvas.width = viewport.width;
                         markerCanvas.height = viewport.height;
 
-                        currentRenderTask = page.render({ canvasContext: pdfCtx, viewport: viewport });
-                        await currentRenderTask.promise;
-                        currentRenderTask = null;
+                        const renderTask = page.render({ canvasContext: pdfCtx, viewport: viewport });
+                        currentRenderTask = renderTask;
+                        await renderTask.promise;
+                        if (currentRenderTask === renderTask) {
+                            currentRenderTask = null;
+                        }
 
                         pageItem.dataUrl = pdfCanvas.toDataURL('image/png');
                         fitToScreen();
@@ -719,7 +894,7 @@
                         updateBOMSummary();
                     }
                 } catch (err) {
-                    if (err && err.name === 'RenderingCancelledException') {
+                    if (err && (err.name === 'RenderingCancelledException' || err.message?.includes('cancelled'))) {
                         return;
                     }
                     console.error("PDF Render Exception:", err);
@@ -737,6 +912,7 @@
 
         async function loadBlueprintFile(file) {
             if (!file) return;
+            saveHistory();
             activeFileName = file.name;
             pagesList = [];
             placedTags = [];
@@ -783,6 +959,7 @@
             });
 
             if (!duplicateOption) return;
+            saveHistory();
 
             const currentCanvasData = pdfCanvas.toDataURL('image/png');
 
@@ -822,6 +999,7 @@
             });
 
             if (!confirmDelete) return;
+            saveHistory();
 
             const deletedPageNum = pageNum;
 
@@ -848,8 +1026,8 @@
                 const tag = placedTags[i];
                 if (tag.page !== pageNum) continue;
 
-                if (tag.shape === 'circle') {
-                    if (Math.hypot(cx - tag.x, cy - tag.y) <= (tag.radius || 20)) return tag;
+                if (tag.shape === 'circle' || tag.shape === 'count') {
+                    if (Math.hypot(cx - tag.x, cy - tag.y) <= (tag.radius || 18)) return tag;
                 } else if (tag.shape === 'rectangle') {
                     const minX = Math.min(tag.x, tag.x2), maxX = Math.max(tag.x, tag.x2);
                     const minY = Math.min(tag.y, tag.y2), maxY = Math.max(tag.y, tag.y2);
@@ -858,6 +1036,9 @@
                     const minX = Math.min(tag.x, tag.x2) - 10, maxX = Math.max(tag.x, tag.x2) + 10;
                     const minY = Math.min(tag.y, tag.y2) - 10, maxY = Math.max(tag.y, tag.y2) + 10;
                     if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return tag;
+                } else if (tag.shape === 'polygon' && tag.points && tag.points.length > 0) {
+                    const p0 = tag.points[0];
+                    if (Math.hypot(cx - p0.x, cy - p0.y) <= 25) return tag;
                 }
             }
             return null;
@@ -920,13 +1101,13 @@
 
             const metrics = computeShapeMetrics(tag);
 
-            if (tag.shape === 'circle') {
-                const r = tag.radius || 20;
+            if (tag.shape === 'circle' || tag.shape === 'count') {
+                const r = tag.radius || 18;
                 ctx.beginPath();
                 ctx.arc(tag.x, tag.y, r, 0, 2 * Math.PI);
                 ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1.0; ctx.stroke();
                 
-                const labelText = `${tag.name}${metrics.area > 0 ? ` (${metrics.area.toFixed(2)} m²)` : ''}`;
+                const labelText = tag.shape === 'count' ? `${tag.name}` : `${tag.name}${metrics.area > 0 ? ` (${metrics.area.toFixed(2)} m²)` : ''}`;
                 ctx.font = 'bold 12px Prompt, sans-serif';
                 const textWidth = ctx.measureText(labelText).width;
                 ctx.fillStyle = tag.color;
@@ -974,6 +1155,13 @@
                 if (!isTemp) ctx.closePath();
                 ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1.0; ctx.stroke();
 
+                if (isTemp && tag.points.length >= 1) {
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath();
+                    ctx.arc(tag.points[0].x, tag.points[0].y, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+
                 if (tag.points.length > 0) {
                     const labelText = `${tag.name} (${metrics.area.toFixed(2)} m², ยาว ${metrics.perimeter}m)`;
                     ctx.font = 'bold 11px Prompt, sans-serif';
@@ -1007,6 +1195,34 @@
                 return;
             }
 
+            // Single-click Count Tool: Instant tag placement +1
+            if (activeTool === 'count') {
+                saveHistory();
+                const newTag = {
+                    id: 'tag_' + Date.now(),
+                    page: pageNum,
+                    name: activeTagConfig.name,
+                    shape: 'count',
+                    color: activeTagConfig.color,
+                    w: activeTagConfig.w,
+                    l: activeTagConfig.l,
+                    h: activeTagConfig.h,
+                    x: pos.x,
+                    y: pos.y,
+                    x2: pos.x,
+                    y2: pos.y,
+                    radius: 18,
+                    isAutoScaled: false
+                };
+                placedTags.push(newTag);
+                selectedTagId = newTag.id;
+                redrawMarkers();
+                updateBOMSummary();
+                renderPresets();
+                triggerAutoSave();
+                return;
+            }
+
             if (activeTool === 'select') {
                 const hitTag = findTagAtPosition(pos.x, pos.y);
                 if (hitTag) {
@@ -1016,6 +1232,13 @@
                 } else selectedTagId = null;
                 redrawMarkers(); updateBOMSummary();
             } else if (activeTool === 'polygon') {
+                if (polygonPoints.length >= 3) {
+                    const distToStart = Math.hypot(pos.x - polygonPoints[0].x, pos.y - polygonPoints[0].y);
+                    if (distToStart <= 18) {
+                        finalizeDrawing();
+                        return;
+                    }
+                }
                 polygonPoints.push(pos);
                 tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'polygon', color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, points: polygonPoints };
                 redrawMarkers();
@@ -1041,6 +1264,9 @@
                 if (tag) {
                     const dx = pos.x - dragOffset.x - tag.x, dy = pos.y - dragOffset.y - tag.y;
                     tag.x += dx; tag.y += dy; tag.x2 += dx; tag.y2 += dy;
+                    if (tag.points && Array.isArray(tag.points)) {
+                        tag.points.forEach(p => { p.x += dx; p.y += dy; });
+                    }
                     redrawMarkers();
                 }
             } else if (isDrawing && tempShape) {
@@ -1069,6 +1295,7 @@
                         showCancel: true
                     }).then(val => {
                         if (val && !isNaN(val) && parseFloat(val) > 0) {
+                            saveHistory();
                             const realMeters = parseFloat(val);
                             pixelsPerMeter = pxLen / realMeters;
                             updateScaleUIBadges();
@@ -1083,14 +1310,15 @@
                 return;
             }
 
-            if (activeTool === 'line' || activeTool === 'polygon') return;
+            if (activeTool === 'line' || activeTool === 'polygon' || activeTool === 'count') return;
             if (isDrawing && tempShape) finalizeDrawing();
         }
 
         function finalizeDrawing() {
             if (!tempShape) return;
+            saveHistory();
             isDrawing = false;
-            if (autoCalcFromScale && tempShape.shape !== 'polygon') {
+            if (autoCalcFromScale && tempShape.shape !== 'polygon' && tempShape.shape !== 'count') {
                 const metrics = computeShapeMetrics(tempShape);
                 tempShape.w = metrics.w; tempShape.l = metrics.l;
             }
@@ -1131,18 +1359,27 @@
                     summaryMap[key] = {
                         name: tag.name, shape: tag.shape, color: tag.color,
                         w: metrics.w, l: metrics.l, h: metrics.h,
-                        totalArea: 0, count: 0
+                        totalArea: 0, totalVolume: 0, count: 0
                     };
                 }
                 summaryMap[key].count += 1;
                 summaryMap[key].totalArea += metrics.area;
+                summaryMap[key].totalVolume += metrics.volume;
             });
 
+            let grandTotalArea = 0;
+            let grandTotalVolume = 0;
+            let grandTotalCount = 0;
+
             Object.values(summaryMap).forEach(item => {
+                grandTotalArea += item.totalArea;
+                grandTotalVolume += item.totalVolume;
+                grandTotalCount += item.count;
+
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
-                const shapeIcon = item.shape === 'circle' ? 'fa-circle' : item.shape === 'rectangle' ? 'fa-square' : item.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
-                const shapeText = item.shape === 'circle' ? 'วงกลม' : item.shape === 'rectangle' ? 'สี่เหลี่ยม' : item.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง';
+                const shapeIcon = item.shape === 'count' ? 'fa-hashtag' : item.shape === 'circle' ? 'fa-circle' : item.shape === 'rectangle' ? 'fa-square' : item.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
+                const shapeText = item.shape === 'count' ? 'จุดนับ' : item.shape === 'circle' ? 'วงกลม' : item.shape === 'rectangle' ? 'สี่เหลี่ยม' : item.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง';
                 const dimStr = formatDimensionDisplay(item.w, item.l, item.h);
 
                 tr.innerHTML = `
@@ -1150,23 +1387,39 @@
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${item.color}"></span>
                         <span>${item.name}</span>
                     </td>
-                    <td class="py-2.5 text-slate-600"><i class="fa-regular ${shapeIcon} text-[10px] mr-1"></i>${shapeText}</td>
+                    <td class="py-2.5 text-slate-600"><i class="fa-solid ${shapeIcon} text-[10px] mr-1"></i>${shapeText}</td>
                     <td class="py-2.5 font-mono text-[11px] text-slate-600">${dimStr}</td>
                     <td class="py-2.5 font-mono text-right font-bold text-slate-800">${item.totalArea > 0 ? `${item.totalArea.toFixed(2)} m²` : '-'}</td>
+                    <td class="py-2.5 font-mono text-right font-bold text-emerald-700">${item.totalVolume > 0 ? `${item.totalVolume.toFixed(2)} m³` : '-'}</td>
                     <td class="py-2.5 text-right font-bold text-blue-600 text-sm">${item.count}</td>
                 `;
                 tableBody.appendChild(tr);
             });
 
+            // Append Grand Total Row
+            const totalTr = document.createElement('tr');
+            totalTr.className = 'bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-900';
+            totalTr.innerHTML = `
+                <td class="py-2.5 text-slate-800" colspan="3"><i class="fa-solid fa-calculator text-blue-600 mr-1"></i> รวมทั้งสิ้น</td>
+                <td class="py-2.5 font-mono text-right font-bold text-slate-900">${grandTotalArea > 0 ? `${grandTotalArea.toFixed(2)} m²` : '-'}</td>
+                <td class="py-2.5 font-mono text-right font-bold text-emerald-800">${grandTotalVolume > 0 ? `${grandTotalVolume.toFixed(2)} m³` : '-'}</td>
+                <td class="py-2.5 text-right font-bold text-blue-700 text-sm">${grandTotalCount}</td>
+            `;
+            tableBody.appendChild(totalTr);
+
             tagsToDisplay.forEach((tag, idx) => {
                 const metrics = computeShapeMetrics(tag);
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `flex items-center justify-between p-1.5 rounded text-xs border ${tag.id === selectedTagId ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-200'} cursor-pointer`;
+                const infoParts = [`หน้า ${tag.page}`];
+                if (metrics.area > 0) infoParts.push(`${metrics.area.toFixed(2)} m²`);
+                if (metrics.volume > 0) infoParts.push(`${metrics.volume.toFixed(2)} m³`);
+
                 itemDiv.innerHTML = `
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
                         <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.name}</span>
-                        <span class="text-[10px] text-slate-500 truncate">(หน้า ${tag.page}${metrics.area > 0 ? ` - ${metrics.area.toFixed(2)} m²` : ''})</span>
+                        <span class="text-[10px] text-slate-500 truncate">(${infoParts.join(' - ')})</span>
                     </div>
                     <button class="btn-del-tag text-red-500 hover:text-red-700 px-1" data-id="${tag.id}"><i class="fa-solid fa-xmark"></i></button>
                 `;
@@ -1178,6 +1431,7 @@
                 });
                 itemDiv.querySelector('.btn-del-tag').addEventListener('click', (e) => {
                     e.stopPropagation();
+                    saveHistory();
                     placedTags = placedTags.filter(t => t.id !== tag.id);
                     if (selectedTagId === tag.id) selectedTagId = null;
                     redrawMarkers(); updateBOMSummary(); triggerAutoSave();
@@ -1193,7 +1447,7 @@
             tagPresets.forEach(preset => {
                 const btn = document.createElement('div');
                 btn.className = `p-2 rounded-lg border flex items-center justify-between cursor-pointer transition ${activeTagConfig.name === preset.name ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`;
-                const shapeIcon = preset.shape === 'circle' ? 'fa-circle' : preset.shape === 'rectangle' ? 'fa-square' : preset.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
+                const shapeIcon = preset.shape === 'count' ? 'fa-hashtag' : preset.shape === 'circle' ? 'fa-circle' : preset.shape === 'rectangle' ? 'fa-square' : preset.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
                 const dimText = formatPresetDimensionText(preset);
 
                 btn.innerHTML = `
@@ -1202,7 +1456,7 @@
                         <div>
                             <div class="font-bold text-xs text-slate-800 flex items-center gap-1">
                                 <span>${preset.name}</span>
-                                <i class="fa-regular ${shapeIcon} text-[10px] text-slate-400"></i>
+                                <i class="fa-solid ${shapeIcon} text-[10px] text-slate-400"></i>
                             </div>
                             ${dimText ? `<div class="text-[10px] text-slate-500 font-mono">${dimText}</div>` : ''}
                         </div>
@@ -1260,7 +1514,7 @@
 
         function setTool(toolName) {
             activeTool = toolName;
-            if (['circle', 'rectangle', 'line', 'polygon'].includes(toolName)) {
+            if (['count', 'circle', 'rectangle', 'line', 'polygon'].includes(toolName)) {
                 activeTagConfig.shape = toolName;
             }
             document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -1273,7 +1527,8 @@
                 }
             });
             const statusEl = document.getElementById('tool-status');
-            if (statusEl) statusEl.innerHTML = `โหมด: ${toolName}`;
+            const toolDisplayNames = { select: 'เลือก/ย้ายวัตถุ', pan: 'เลื่อนมุมมอง', scale: 'ตั้งสเกลแปลน', count: 'นับจำนวน (คลิกเพื่อปักจุด +1)', circle: 'วาดวงกลม', rectangle: 'วาดสี่เหลี่ยม', line: 'วาดเส้นตรง', polygon: 'วาดหลายเหลี่ยม' };
+            if (statusEl) statusEl.innerHTML = `โหมด: ${toolDisplayNames[toolName] || toolName}`;
             if (canvasWrapper) {
                 canvasWrapper.style.cursor = toolName === 'pan' ? 'grab' : toolName === 'select' ? 'default' : 'crosshair';
             }
@@ -1281,7 +1536,7 @@
 
         function saveProjectJSON() {
             const projectData = {
-                version: '5.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
+                version: '8.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
                 autoCalcFromScale, tagPresets, activeTagConfig, placedTags, pagesList
             };
             const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
@@ -1297,6 +1552,7 @@
             const reader = new FileReader();
             reader.onload = async function (e) {
                 try {
+                    saveHistory();
                     const data = JSON.parse(e.target.result);
                     activeFileName = data.activeFileName || "blueprint";
                     pageNum = data.pageNum || 1;
@@ -1327,19 +1583,22 @@
                 if (!summaryMap[key]) {
                     summaryMap[key] = {
                         name: tag.name,
-                        shape: tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
-                        w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, count: 0
+                        shape: tag.shape === 'count' ? 'จุดนับ' : tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
+                        w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, totalVolume: 0, count: 0
                     };
                 }
                 summaryMap[key].count += 1;
                 summaryMap[key].totalArea += metrics.area;
+                summaryMap[key].totalVolume += metrics.volume;
             });
 
             Object.values(summaryMap).forEach((item, idx) => {
                 excelRows.push({
                     'ลำดับ': idx + 1, 'รหัสแท๊ก': item.name, 'รูปทรง': item.shape,
                     'ความกว้าง (m)': item.w || '-', 'ความยาว (m)': item.l || '-', 'ความสูง (m)': item.h || '-',
-                    'พื้นที่รวม (m²)': item.totalArea > 0 ? item.totalArea.toFixed(2) : '-', 'จำนวน': item.count
+                    'พื้นที่รวม (m²)': item.totalArea > 0 ? item.totalArea.toFixed(2) : '-',
+                    'ปริมาตรรวม (m³)': item.totalVolume > 0 ? item.totalVolume.toFixed(2) : '-',
+                    'จำนวน': item.count
                 });
             });
 
@@ -1371,14 +1630,24 @@
                 const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
                 if (!summaryMap[key]) {
                     summaryMap[key] = {
-                        name: tag.name, shape: tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
-                        w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, count: 0
+                        name: tag.name, shape: tag.shape === 'count' ? 'จุดนับ' : tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
+                        w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, totalVolume: 0, count: 0
                     };
                 }
-                summaryMap[key].count += 1; summaryMap[key].totalArea += metrics.area;
+                summaryMap[key].count += 1;
+                summaryMap[key].totalArea += metrics.area;
+                summaryMap[key].totalVolume += metrics.volume;
             });
 
+            let grandTotalArea = 0;
+            let grandTotalVolume = 0;
+            let grandTotalCount = 0;
+
             Object.values(summaryMap).forEach((item, idx) => {
+                grandTotalArea += item.totalArea;
+                grandTotalVolume += item.totalVolume;
+                grandTotalCount += item.count;
+
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-slate-200';
                 const dimStr = formatDimensionDisplay(item.w, item.l, item.h);
@@ -1388,16 +1657,33 @@
                     <td class="p-2 border-r border-slate-200">${item.shape}</td>
                     <td class="p-2 border-r border-slate-200 font-mono">${dimStr}</td>
                     <td class="p-2 border-r border-slate-200 text-right font-mono font-bold">${item.totalArea > 0 ? `${item.totalArea.toFixed(2)} m²` : '-'}</td>
+                    <td class="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-800">${item.totalVolume > 0 ? `${item.totalVolume.toFixed(2)} m³` : '-'}</td>
                     <td class="p-2 text-right font-bold text-blue-600">${item.count}</td>
                 `;
                 printTableBody.appendChild(tr);
             });
+
+            // Grand Total Row in Print Modal
+            const totalTr = document.createElement('tr');
+            totalTr.className = 'bg-slate-100 border-t-2 border-slate-400 font-bold text-slate-900';
+            totalTr.innerHTML = `
+                <td class="p-2 border-r border-slate-300 text-center" colspan="4">รวมทั้งสิ้น</td>
+                <td class="p-2 border-r border-slate-300 text-right font-mono font-bold">${grandTotalArea > 0 ? `${grandTotalArea.toFixed(2)} m²` : '-'}</td>
+                <td class="p-2 border-r border-slate-300 text-right font-mono font-bold text-emerald-800">${grandTotalVolume > 0 ? `${grandTotalVolume.toFixed(2)} m³` : '-'}</td>
+                <td class="p-2 text-right font-bold text-blue-700">${grandTotalCount}</td>
+            `;
+            printTableBody.appendChild(totalTr);
+
             const printModal = document.getElementById('print-modal');
             if (printModal) printModal.classList.remove('hidden');
         }
 
         function setupEventListeners() {
             initDOMElements();
+
+            // Undo / Redo Buttons
+            document.getElementById('btn-undo')?.addEventListener('click', undo);
+            document.getElementById('btn-redo')?.addEventListener('click', redo);
 
             document.getElementById('btn-quick-scale')?.addEventListener('click', () => {
                 setTool('scale');
@@ -1458,12 +1744,12 @@
                 }
             });
 
-            // FIXED: Add Preset Button reads inputs cleanly without forcing defaults
+            // Add Preset button
             document.getElementById('btn-add-preset')?.addEventListener('click', () => {
                 syncActiveTagFromInputs();
                 let shapeVal = activeTagConfig.shape || activeTool;
-                if (!['circle', 'rectangle', 'line', 'polygon'].includes(shapeVal)) {
-                    shapeVal = 'circle';
+                if (!['count', 'circle', 'rectangle', 'line', 'polygon'].includes(shapeVal)) {
+                    shapeVal = 'count';
                 }
 
                 const newPreset = {
@@ -1485,6 +1771,7 @@
 
             document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
                 if (await showModal({ title: 'ยืนยันการลบ', message: 'ต้องการลบรายการมาร์กทั้งหมดหรือไม่?', showCancel: true })) {
+                    saveHistory();
                     placedTags = []; selectedTagId = null; redrawMarkers(); updateBOMSummary(); triggerAutoSave();
                 }
             });
@@ -1498,6 +1785,13 @@
                 canvasWrapper.addEventListener('mousedown', handleCanvasMouseDown);
                 window.addEventListener('mousemove', handleCanvasMouseMove);
                 window.addEventListener('mouseup', handleCanvasMouseUp);
+                
+                canvasWrapper.addEventListener('dblclick', () => {
+                    if (activeTool === 'polygon' && polygonPoints.length >= 3) {
+                        finalizeDrawing();
+                    }
+                });
+
                 canvasWrapper.addEventListener('wheel', (e) => {
                     e.preventDefault();
                     const rect = canvasWrapper.getBoundingClientRect();
@@ -1509,9 +1803,29 @@
                 }, { passive: false });
             }
 
+            // Keyboard Shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+C, Ctrl+V, Delete)
             window.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && activeTool === 'polygon' && polygonPoints.length > 2) finalizeDrawing();
-                if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTagId && document.activeElement.tagName !== 'INPUT') {
+                const isEditingInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+                
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key.toLowerCase() === 'z') {
+                        if (e.shiftKey) {
+                            e.preventDefault(); redo();
+                        } else {
+                            e.preventDefault(); undo();
+                        }
+                    } else if (e.key.toLowerCase() === 'y') {
+                        e.preventDefault(); redo();
+                    } else if (e.key.toLowerCase() === 'c' && !isEditingInput) {
+                        e.preventDefault(); copySelectedTag();
+                    } else if (e.key.toLowerCase() === 'v' && !isEditingInput) {
+                        e.preventDefault(); pasteCopiedTag();
+                    }
+                }
+
+                if (e.key === 'Enter' && activeTool === 'polygon' && polygonPoints.length >= 3) finalizeDrawing();
+                if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTagId && !isEditingInput) {
+                    saveHistory();
                     placedTags = placedTags.filter(t => t.id !== selectedTagId);
                     selectedTagId = null; redrawMarkers(); updateBOMSummary(); triggerAutoSave();
                 }
@@ -1519,7 +1833,7 @@
         }
 
         window.addEventListener('load', async () => {
-            setupEventListeners(); updateScaleUIBadges();
+            setupEventListeners(); updateScaleUIBadges(); updateUndoRedoUI();
             await initIndexedDB(); renderPresets(); updateActiveTagUI();
         });
     </script>
