@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบมาร์กแบบแปลนและถอดแบบ BOM Pro (Structural Tagging & BOM Pro)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PDF.js for rendering PDF blueprints -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- SheetJS for exporting Excel files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        #canvas-wrapper { user-select: none; touch-action: none; overflow: hidden; position: relative; }
+        #canvas-container { transform-origin: 0 0; position: absolute; top: 0; left: 0; }
+        .toast-enter { transform: translateY(100%); opacity: 0; }
+        .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease-out; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+            .page-break { page-break-after: always; break-after: page; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between shadow-md z-30 no-print">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600 text-white p-2 rounded-lg font-bold flex items-center justify-center w-9 h-9">
+                <i class="fa-solid fa-drafting-compass"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base leading-tight">ระบบมาร์กแบบแปลนและจัดทำ BOM Pro</h1>
+                <div class="flex items-center gap-2">
+                    <p class="text-xs text-slate-400">Structural Take-off & Quantity Tagging Tool</p>
+                    <span id="auto-save-status" class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-800/50 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="auto-save-text">บันทึกแล้ว</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document / Project Controls -->
+        <div class="flex items-center space-x-2">
+            <button id="btn-save-project" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>บันทึกโครงการ (.json)</span>
+            </button>
+            <label class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-folder-open"></i>
+                <span>เปิดโครงการ (.json)</span>
+                <input type="file" id="project-file-input" accept=".json" class="hidden">
+            </label>
+
+            <div class="h-5 w-px bg-slate-700 mx-1"></div>
+
+            <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg cursor-pointer transition flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>เปิดแปลน (PDF/รูป)</span>
+                <input type="file" id="file-input" accept="application/pdf,image/*" class="hidden">
+            </label>
+
+            <!-- Page Navigation & Page Manipulation Controls -->
+            <div id="page-controls" class="hidden flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1">
+                <button id="btn-prev-page" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40" title="หน้าก่อนหน้า">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span class="px-2 text-slate-300">หน้า <span id="current-page">1</span> / <span id="total-pages">1</span></span>
+                <button id="btn-next-page" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40" title="หน้าถัดไป">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+
+                <div class="h-4 w-px bg-slate-700 mx-0.5"></div>
+
+                <button id="btn-duplicate-page" class="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 rounded transition flex items-center gap-1 text-[11px]" title="คัดลอกหน้าปัจจุบันและแทรกเป็นหน้าถัดไป">
+                    <i class="fa-solid fa-copy"></i>
+                    <span>คัดลอกหน้านี้</span>
+                </button>
+                <button id="btn-delete-page" class="bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded transition flex items-center gap-1 text-[11px]" title="ลบหน้าปัจจุบันออกจากโครงการ">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>ลบหน้านี้</span>
+                </button>
+            </div>
+
+            <div class="h-5 w-px bg-slate-700 mx-1"></div>
+
+            <div class="flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700">
+                <button id="btn-zoom-out" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300" title="ย่อ"><i class="fa-solid fa-minus"></i></button>
+                <span id="zoom-level" class="px-2 font-mono text-slate-300 w-12 text-center">100%</span>
+                <button id="btn-zoom-in" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300" title="ขยาย"><i class="fa-solid fa-plus"></i></button>
+                <button id="btn-zoom-fit" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300 ml-1 border-l border-slate-700" title="พอดีหน้าจอ"><i class="fa-solid fa-expand"></i></button>
+                <button id="btn-zoom-reset" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300" title="ขนาดจริง 100%"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+        </div>
+
+        <!-- Export Actions -->
+        <div class="flex items-center space-x-2">
+            <button id="btn-export-excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-file-excel"></i>
+                <span>ส่งออก Excel</span>
+            </button>
+            <button id="btn-export-pdf" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-print"></i>
+                <span>พิมพ์ / พิมพ์ PDF</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Left Sidebar: Tools & Presets -->
+        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm no-print">
+            <div class="p-3 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-toolbox"></i> เครื่องมือมาร์ก (Drawing Tools)
+                </h2>
+                <div class="grid grid-cols-6 gap-1">
+                    <button data-tool="select" class="tool-btn active bg-blue-50 border-blue-500 text-blue-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลือก/ย้าย">
+                        <i class="fa-solid fa-hand-pointer text-xs mb-1"></i>
+                        <span>เลือก/ย้าย</span>
+                    </button>
+                    <button data-tool="pan" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลื่อนมุมมอง">
+                        <i class="fa-solid fa-up-down-left-right text-xs mb-1"></i>
+                        <span>เลื่อน</span>
+                    </button>
+                    <button data-tool="circle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="วงกลม">
+                        <i class="fa-regular fa-circle text-xs mb-1"></i>
+                        <span>วงกลม</span>
+                    </button>
+                    <button data-tool="rectangle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="สี่เหลี่ยม">
+                        <i class="fa-regular fa-square text-xs mb-1"></i>
+                        <span>สี่เหลี่ยม</span>
+                    </button>
+                    <button data-tool="line" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เส้นตรง">
+                        <i class="fa-solid fa-slash text-xs mb-1"></i>
+                        <span>เส้นตรง</span>
+                    </button>
+                    <button data-tool="polygon" class="tool-btn bg-white border-slate-200 text-indigo-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="หลายเหลี่ยม">
+                        <i class="fa-solid fa-draw-polygon text-xs mb-1"></i>
+                        <span>หลายเหลี่ยม</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Tag Setup -->
+            <div class="p-3 border-b border-slate-200 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-sliders"></i> ตั้งค่าแท๊กปัจจุบัน
+                    </h2>
+                    <span id="active-tag-preview" class="inline-block w-4 h-4 rounded-full border border-slate-300 shadow-sm" style="background-color: #ef4444;"></span>
+                </div>
+
+                <!-- Auto Scale Calculation Toggle Switch -->
+                <div class="flex items-center justify-between bg-blue-50/70 p-2 rounded-lg border border-blue-200">
+                    <div class="text-[11px] text-blue-900 font-medium flex items-center gap-1.5">
+                        <i class="fa-solid fa-calculator text-blue-600"></i>
+                        <span>คำนวณพื้นที่จากสเกลลากวาด:</span>
+                    </div>
+                    <label class="inline-flex items-center cursor-pointer text-xs">
+                        <input type="checkbox" id="auto-calc-toggle" class="sr-only peer" checked>
+                        <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600 relative"></div>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-slate-600 mb-1">รหัสแท๊ก (Tag Name)</label>
+                        <input type="text" id="tag-name-input" value="F1" placeholder="เช่น F1, C1" class="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 font-bold focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-600 mb-1">สีมาร์ก (Color)</label>
+                        <div class="flex items-center gap-1">
+                            <input type="color" id="tag-color-input" value="#ef4444" class="w-8 h-7 p-0 border-0 rounded cursor-pointer">
+                            <input type="text" id="tag-color-hex" value="#ef4444" class="w-full text-xs font-mono border border-slate-300 rounded px-2 py-1.5 uppercase">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-slate-600">ขนาดระบุในแบบ (กว้าง x ยาว x สูง)</label>
+                        <span id="scale-info-badge" class="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-mono">1m = 100px</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1">
+                        <input type="text" id="dim-w-input" value="1.00" placeholder="กว้าง" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
+                        <input type="text" id="dim-l-input" value="1.00" placeholder="ยาว" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
+                        <input type="text" id="dim-h-input" value="0.50" placeholder="สูง/ลึก" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
+                    </div>
+                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* ขนาด กว้าง x ยาว จะถูกคำนวณอัตโนมัติจากการลากรูปทรง</p>
+                </div>
+            </div>
+
+            <!-- Presets Section -->
+            <div class="flex-1 flex flex-col min-h-0 p-3">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-bookmark"></i> แม่แบบแท๊ก (Presets)
+                    </h2>
+                    <button id="btn-add-preset" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded font-medium transition flex items-center gap-1">
+                        <i class="fa-solid fa-plus text-[10px]"></i> เพิ่มแม่แบบ
+                    </button>
+                </div>
+                <div id="presets-list" class="flex-1 overflow-y-auto space-y-1.5 pr-1"></div>
+            </div>
+        </aside>
+
+        <!-- Center Viewport Canvas -->
+        <main id="main-viewport" class="flex-1 bg-slate-800 relative overflow-hidden flex items-center justify-center p-0">
+            <div id="empty-state" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100 text-slate-500 p-6 text-center">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl mb-4 shadow-sm">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-800 mb-1">ยังไม่มีแบบแปลน</h3>
+                <p class="text-xs text-slate-500 max-w-sm mb-4">อัปโหลดไฟล์แบบแปลน PDF, รูปภาพ หรือเปิดไฟล์โครงการ (.json)</p>
+                <div class="flex gap-2">
+                    <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 px-4 rounded-lg cursor-pointer transition shadow-sm inline-flex items-center gap-2">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <span>เลือกไฟล์แปลน (PDF/รูป)</span>
+                        <input type="file" id="empty-file-input" accept="application/pdf,image/*" class="hidden">
+                    </label>
+                    <label class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium py-2 px-4 rounded-lg cursor-pointer transition shadow-sm inline-flex items-center gap-2">
+                        <i class="fa-solid fa-box-archive"></i>
+                        <span>เปิดโครงการ (.json)</span>
+                        <input type="file" id="empty-project-input" accept=".json" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <div id="canvas-wrapper" class="w-full h-full cursor-crosshair">
+                <div id="canvas-container" class="shadow-2xl bg-white">
+                    <canvas id="pdf-canvas" class="block"></canvas>
+                    <canvas id="marker-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                </div>
+            </div>
+
+            <div class="absolute bottom-3 left-3 bg-slate-900/90 backdrop-blur text-white text-[11px] px-3 py-1.5 rounded-full shadow-lg pointer-events-none flex items-center gap-3 z-10 border border-slate-700">
+                <span id="tool-status"><i class="fa-solid fa-hand-pointer text-blue-400"></i> โหมด: เลือก/ย้ายวัตถุ</span>
+                <span class="text-slate-600">|</span>
+                <span>สเกล: <strong id="status-scale-text" class="text-emerald-400 font-mono">1 m = 100 px</strong></span>
+                <span class="text-slate-600">|</span>
+                <span>จำนวนมาร์กบนหน้านี้: <strong id="page-mark-count" class="text-yellow-400">0</strong> จุด</span>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Live BOM Summary -->
+        <aside class="w-96 bg-white border-l border-slate-200 flex flex-col z-20 shadow-sm no-print">
+            <div class="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xs font-bold uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-list-check text-blue-600"></i> ตารางสรุปรายการ BOM
+                    </h2>
+                    <p class="text-[11px] text-slate-500">สรุปจำนวนและขนาดแยกรหัสแท๊ก</p>
+                </div>
+                <button id="btn-clear-all" class="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded transition flex items-center gap-1 font-medium">
+                    <i class="fa-solid fa-trash-can"></i> ล้างทั้งหมด
+                </button>
+            </div>
+
+            <!-- View Mode Switcher (Current Page vs All Pages) -->
+            <div class="flex border-b border-slate-200 bg-slate-100/80 p-1 text-xs">
+                <button id="tab-bom-current" class="flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200">
+                    หน้านี้ (<span id="count-bom-current">0</span>)
+                </button>
+                <button id="tab-bom-all" class="flex-1 py-1 px-2 rounded font-medium text-center transition text-slate-600 hover:text-slate-900">
+                    รวมทุกหน้า (<span id="count-bom-all">0</span>)
+                </button>
+            </div>
+
+            <!-- Summary Table Content -->
+            <div class="flex-1 overflow-y-auto p-3">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200 text-slate-500 text-[11px]">
+                            <th class="py-2 font-semibold">แท๊ก</th>
+                            <th class="py-2 font-semibold">รูปทรง</th>
+                            <th class="py-2 font-semibold">ขนาด (กxยxส)</th>
+                            <th class="py-2 font-semibold text-right">พื้นที่รวม (m²)</th>
+                            <th class="py-2 font-semibold text-right">จำนวน</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bom-table-body" class="divide-y divide-slate-100"></tbody>
+                </table>
+                <div id="bom-empty-msg" class="py-8 text-center text-slate-400 text-xs">
+                    <i class="fa-solid fa-inbox text-2xl mb-2 text-slate-300 block"></i>
+                    ยังไม่มีข้อมูลมาร์กบนแบบแปลน
+                </div>
+            </div>
+
+            <!-- Placed Items Detail List -->
+            <div class="border-t border-slate-200 p-3 bg-slate-50 max-h-56 flex flex-col">
+                <h3 class="text-xs font-bold text-slate-600 mb-1.5 flex justify-between items-center">
+                    <span><i class="fa-solid fa-layer-group"></i> รายการมาร์ก (<span id="total-items-count">0</span>)</span>
+                </h3>
+                <div id="placed-tags-list" class="flex-1 overflow-y-auto space-y-1 text-xs pr-1"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Custom Modal Dialog -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+            <div class="flex items-center gap-3">
+                <div id="modal-icon" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg shrink-0">
+                    <i class="fa-solid fa-circle-info"></i>
+                </div>
+                <div>
+                    <h3 id="modal-title" class="font-bold text-slate-800 text-sm">แจ้งเตือน</h3>
+                    <p id="modal-message" class="text-xs text-slate-500 mt-0.5">รายละเอียดข้อความ...</p>
+                </div>
+            </div>
+            <div id="modal-input-container" class="hidden">
+                <input type="text" id="modal-input" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button id="modal-btn-cancel" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-medium transition hidden">ยกเลิก</button>
+                <button id="modal-btn-confirm" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition">ตกลง</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2-Page Print Preview Modal -->
+    <div id="print-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-print text-purple-400"></i> รายงานสรุปถอดแบบ 2 หน้า (Print Preview)
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button id="btn-do-print" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-print"></i> พิมพ์เอกสาร (PDF)
+                    </button>
+                    <button id="btn-close-print-modal" class="text-slate-400 hover:text-white px-2 py-1 rounded">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="print-modal-content" class="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
+                <div id="print-area" class="space-y-8">
+                    <!-- Page 1: Blueprint Canvas Overlay -->
+                    <div class="bg-white p-8 rounded shadow border border-slate-200 max-w-3xl mx-auto text-slate-900 page-break">
+                        <div class="border-b-2 border-slate-800 pb-3 mb-4 flex justify-between items-end">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-900">แบบแปลนแสดงมาร์กโครงสร้าง (Plan View)</h1>
+                                <p class="text-xs text-slate-600">หน้า 1 จาก 2 - ภาพแบบแปลนและตำแหน่งแท๊ก</p>
+                            </div>
+                            <div class="text-right text-[11px] text-slate-500">
+                                <p>วันที่: <span class="print-date"></span></p>
+                                <p>ไฟล์: <span class="print-filename"></span></p>
+                            </div>
+                        </div>
+                        <div class="border border-slate-300 rounded p-2 text-center bg-slate-50">
+                            <img id="print-canvas-img" class="max-w-full h-auto mx-auto border border-slate-200 rounded shadow-sm" alt="Marked Plan">
+                        </div>
+                    </div>
+
+                    <!-- Page 2: Full BOM Summary Table -->
+                    <div class="bg-white p-8 rounded shadow border border-slate-200 max-w-3xl mx-auto text-slate-900">
+                        <div class="border-b-2 border-slate-800 pb-3 mb-4 flex justify-between items-end">
+                            <div>
+                                <h1 class="text-xl font-bold text-slate-900">เอกสารสรุปรายการถอดแบบ (BOM Report)</h1>
+                                <p class="text-xs text-slate-600">หน้า 2 จาก 2 - ตารางสรุปปริมาณและมาร์กทั้งหมด</p>
+                            </div>
+                            <div class="text-right text-[11px] text-slate-500">
+                                <p>วันที่: <span class="print-date"></span></p>
+                                <p>ไฟล์: <span class="print-filename"></span></p>
+                            </div>
+                        </div>
+
+                        <h2 class="text-sm font-bold text-slate-800 mb-2">ตารางสรุปรายการปริมาณและพื้นที่ (Summary BOM Table)</h2>
+                        <table class="w-full text-left text-xs border-collapse mb-4 border border-slate-300">
+                            <thead>
+                                <tr class="bg-slate-100 border-b border-slate-300 text-slate-700">
+                                    <th class="p-2 border-r border-slate-300 font-bold">#</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold">แท๊ก</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold">รูปทรง</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold">ขนาด (กxยxส)</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold text-right">พื้นที่รวม (m²)</th>
+                                    <th class="p-2 font-bold text-right">จำนวน</th>
+                                </tr>
+                            </thead>
+                            <tbody id="print-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const DB_NAME = 'StructuralBOMDB_V5';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'projectState';
+        let db = null;
+
+        // Active rendering task handle to prevent canvas render collision
+        let currentRenderTask = null;
+
+        let pdfDoc = null;
+        let pagesList = []; // Stores individual page mapping { pdfPageIndex: Number|null, dataUrl: String|null }
+        let pageNum = 1;
+        let totalPages = 1;
+        let activeFileName = "blueprint";
+        let activeTool = 'select';
+        let autoCalcFromScale = true;
+        let pixelsPerMeter = 100;
+
+        let zoomScale = 1.0;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let panStartPos = { x: 0, y: 0 };
+
+        let bomViewScope = 'current';
+
+        let tagPresets = [
+            { id: 'p1', name: 'F1', shape: 'circle', color: '#ef4444', w: '1.00', l: '1.00', h: '0.50' },
+            { id: 'p2', name: 'F2', shape: 'rectangle', color: '#22c55e', w: '1.20', l: '1.20', h: '0.60' },
+            { id: 'p3', name: 'C1', shape: 'circle', color: '#3b82f6', w: '0.30', l: '0.30', h: '3.00' },
+            { id: 'p4', name: 'W1', shape: 'line', color: '#a855f7', w: '0.20', l: '5.00', h: '3.00' }
+        ];
+
+        let activeTagConfig = { name: 'F1', shape: 'circle', color: '#ef4444', w: '1.00', l: '1.00', h: '0.50' };
+        let placedTags = [];
+        let selectedTagId = null;
+
+        let isDrawing = false;
+        let isDraggingTag = false;
+        let dragOffset = { x: 0, y: 0 };
+        let drawStartPos = { x: 0, y: 0 };
+        let tempShape = null;
+        let polygonPoints = [];
+
+        // DOM elements
+        let pdfCanvas, pdfCtx, markerCanvas, markerCtx, canvasContainer, canvasWrapper, emptyState;
+
+        function initDOMElements() {
+            pdfCanvas = document.getElementById('pdf-canvas');
+            pdfCtx = pdfCanvas ? pdfCanvas.getContext('2d') : null;
+            markerCanvas = document.getElementById('marker-canvas');
+            markerCtx = markerCanvas ? markerCanvas.getContext('2d') : null;
+            canvasContainer = document.getElementById('canvas-container');
+            canvasWrapper = document.getElementById('canvas-wrapper');
+            emptyState = document.getElementById('empty-state');
+        }
+
+        function initIndexedDB() {
+            return new Promise((resolve) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains(STORE_NAME)) {
+                        database.createObjectStore(STORE_NAME);
+                    }
+                };
+                request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+                request.onerror = () => resolve(null);
+            });
+        }
+
+        async function saveStateToIndexedDB() {
+            if (!db) return;
+            try {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put({
+                    activeFileName, pageNum, totalPages, pixelsPerMeter, autoCalcFromScale,
+                    tagPresets, activeTagConfig, placedTags, pagesList
+                }, 'currentProject');
+                updateAutoSaveBadge('บันทึกแล้ว');
+            } catch (err) { console.error("Auto-save error:", err); }
+        }
+
+        function triggerAutoSave() {
+            updateAutoSaveBadge('กำลังบันทึก...');
+            saveStateToIndexedDB();
+        }
+
+        function updateAutoSaveBadge(text) {
+            const badgeText = document.getElementById('auto-save-text');
+            if (badgeText) badgeText.textContent = text;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-800';
+            toast.className = `${bgClass} text-white text-xs px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 toast-enter pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('toast-enter-active'), 10);
+            setTimeout(() => {
+                toast.classList.remove('toast-enter-active');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function showModal(options) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-modal');
+                const titleEl = document.getElementById('modal-title');
+                const msgEl = document.getElementById('modal-message');
+                const inputContainer = document.getElementById('modal-input-container');
+                const inputEl = document.getElementById('modal-input');
+                const btnCancel = document.getElementById('modal-btn-cancel');
+                const btnConfirm = document.getElementById('modal-btn-confirm');
+
+                titleEl.textContent = options.title || 'แจ้งเตือน';
+                msgEl.textContent = options.message || '';
+                if (options.showInput) {
+                    inputContainer.classList.remove('hidden');
+                    inputEl.value = options.inputValue || '';
+                } else inputContainer.classList.add('hidden');
+
+                if (options.showCancel) btnCancel.classList.remove('hidden');
+                else btnCancel.classList.add('hidden');
+
+                modal.classList.remove('hidden');
+                const cleanup = () => {
+                    modal.classList.add('hidden');
+                    btnConfirm.removeEventListener('click', onConfirm);
+                    btnCancel.removeEventListener('click', onCancel);
+                };
+                const onConfirm = () => { cleanup(); resolve(options.showInput ? inputEl.value : true); };
+                const onCancel = () => { cleanup(); resolve(options.showInput ? null : false); };
+                btnConfirm.addEventListener('click', onConfirm);
+                btnCancel.addEventListener('click', onCancel);
+            });
+        }
+
+        function updateScaleUIBadges() {
+            const scaleBadge = document.getElementById('scale-info-badge');
+            const statusScaleText = document.getElementById('status-scale-text');
+            const pxText = `${pixelsPerMeter.toFixed(1)} px`;
+            if (scaleBadge) scaleBadge.textContent = `1m = ${pxText}`;
+            if (statusScaleText) statusScaleText.textContent = `1 m = ${pxText}`;
+        }
+
+        function getCanvasCoords(e) {
+            if (!canvasWrapper) return { x: 0, y: 0 };
+            const rect = canvasWrapper.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left - panX) / zoomScale,
+                y: (e.clientY - rect.top - panY) / zoomScale
+            };
+        }
+
+        function updateTransform() {
+            if (canvasContainer) {
+                canvasContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+            }
+            const zoomLevel = document.getElementById('zoom-level');
+            if (zoomLevel) zoomLevel.textContent = `${Math.round(zoomScale * 100)}%`;
+        }
+
+        function resetZoom() { zoomScale = 1.0; panX = 0; panY = 0; updateTransform(); }
+
+        function fitToScreen() {
+            if (!pdfCanvas || !pdfCanvas.width || !pdfCanvas.height || !canvasWrapper) return;
+            const wrapperW = canvasWrapper.clientWidth;
+            const wrapperH = canvasWrapper.clientHeight;
+            const scaleX = (wrapperW - 40) / pdfCanvas.width;
+            const scaleY = (wrapperH - 40) / pdfCanvas.height;
+            zoomScale = Math.min(scaleX, scaleY, 2.0);
+            panX = (wrapperW - pdfCanvas.width * zoomScale) / 2;
+            panY = (wrapperH - pdfCanvas.height * zoomScale) / 2;
+            updateTransform();
+        }
+
+        function computeShapeMetrics(shape) {
+            const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : 100;
+            let realW = parseFloat(shape.w) || 0;
+            let realL = parseFloat(shape.l) || 0;
+            let realH = parseFloat(shape.h) || 0;
+            let area = 0;
+            let perimeter = 0;
+
+            if (shape.shape === 'circle') {
+                const r = shape.radius || 20;
+                const realR = r / ppm;
+                area = Math.PI * Math.pow(realR, 2);
+                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled)) {
+                    realW = realR * 2;
+                    realL = realR * 2;
+                }
+            } else if (shape.shape === 'rectangle') {
+                const pxW = Math.abs(shape.x2 - shape.x);
+                const pxH = Math.abs(shape.y2 - shape.y);
+                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled)) {
+                    realW = pxW / ppm;
+                    realL = pxH / ppm;
+                }
+                area = realW * realL;
+            } else if (shape.shape === 'line') {
+                const lenPx = Math.hypot(shape.x2 - shape.x, shape.y2 - shape.y);
+                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled)) {
+                    realL = lenPx / ppm;
+                }
+                area = realL * realH;
+            } else if (shape.shape === 'polygon' && shape.points && shape.points.length > 2) {
+                let pxArea = 0;
+                let pxPerimeter = 0;
+                const pts = shape.points;
+                for (let i = 0; i < pts.length; i++) {
+                    const j = (i + 1) % pts.length;
+                    pxArea += pts[i].x * pts[j].y;
+                    pxArea -= pts[j].x * pts[i].y;
+                    pxPerimeter += Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
+                }
+                area = Math.abs(pxArea / 2) / (ppm * ppm);
+                perimeter = pxPerimeter / ppm;
+                if (autoCalcFromScale) {
+                    realW = Math.sqrt(area);
+                    realL = Math.sqrt(area);
+                }
+            }
+
+            return {
+                w: realW.toFixed(2),
+                l: realL.toFixed(2),
+                h: realH.toFixed(2),
+                area: area,
+                perimeter: perimeter.toFixed(2)
+            };
+        }
+
+        async function renderPage(num) {
+            if (num < 1 || num > totalPages) return;
+            pageNum = num;
+
+            if (currentRenderTask) {
+                try {
+                    currentRenderTask.cancel();
+                } catch (e) { /* ignore */ }
+                currentRenderTask = null;
+            }
+
+            const pageItem = pagesList[num - 1];
+            if (!pageItem) return;
+
+            if (pageItem.dataUrl) {
+                const img = new Image();
+                img.onload = () => {
+                    if (pdfCanvas && markerCanvas && pdfCtx) {
+                        pdfCanvas.width = img.width;
+                        pdfCanvas.height = img.height;
+                        markerCanvas.width = img.width;
+                        markerCanvas.height = img.height;
+                        pdfCtx.drawImage(img, 0, 0);
+                        fitToScreen();
+                        redrawMarkers();
+                        updateBOMSummary();
+                    }
+                };
+                img.src = pageItem.dataUrl;
+            } else if (pdfDoc && pageItem.pdfPageIndex) {
+                try {
+                    const page = await pdfDoc.getPage(pageItem.pdfPageIndex);
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    if (pdfCanvas && markerCanvas && pdfCtx) {
+                        pdfCanvas.width = viewport.width;
+                        pdfCanvas.height = viewport.height;
+                        markerCanvas.width = viewport.width;
+                        markerCanvas.height = viewport.height;
+
+                        currentRenderTask = page.render({ canvasContext: pdfCtx, viewport: viewport });
+                        await currentRenderTask.promise;
+                        currentRenderTask = null;
+
+                        pageItem.dataUrl = pdfCanvas.toDataURL('image/png');
+                        fitToScreen();
+                        redrawMarkers();
+                        updateBOMSummary();
+                    }
+                } catch (err) {
+                    if (err && err.name === 'RenderingCancelledException') {
+                        return;
+                    }
+                    console.error("PDF Render Exception:", err);
+                }
+            }
+
+            const curPageEl = document.getElementById('current-page');
+            const totPageEl = document.getElementById('total-pages');
+            const pageCtrlEl = document.getElementById('page-controls');
+
+            if (curPageEl) curPageEl.textContent = pageNum;
+            if (totPageEl) totPageEl.textContent = totalPages;
+            if (pageCtrlEl) pageCtrlEl.classList.remove('hidden');
+        }
+
+        async function loadBlueprintFile(file) {
+            if (!file) return;
+            activeFileName = file.name;
+            pagesList = [];
+            placedTags = [];
+
+            const reader = new FileReader();
+            if (file.type === 'application/pdf') {
+                reader.onload = async function (e) {
+                    const arrayBuffer = e.target.result;
+                    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                    totalPages = pdfDoc.numPages;
+                    
+                    pagesList = [];
+                    for (let i = 1; i <= totalPages; i++) {
+                        pagesList.push({ pdfPageIndex: i, dataUrl: null });
+                    }
+
+                    await renderPage(1);
+                    if (emptyState) emptyState.classList.add('hidden');
+                    triggerAutoSave();
+                    showToast(`โหลดแบบแปลน PDF สำเร็จ (${totalPages} หน้า)`, 'success');
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (file.type.startsWith('image/')) {
+                reader.onload = function (e) {
+                    pdfDoc = null;
+                    totalPages = 1;
+                    pagesList = [{ pdfPageIndex: null, dataUrl: e.target.result }];
+                    renderPage(1);
+                    if (emptyState) emptyState.classList.add('hidden');
+                    triggerAutoSave();
+                    showToast(`โหลดรูปภาพสำเร็จ`, 'success');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        /** Real-time Page Insertion Logic */
+        async function duplicateCurrentPage() {
+            if (!pdfCanvas || !pdfCanvas.width || pagesList.length === 0) return;
+
+            const duplicateOption = await showModal({
+                title: 'คัดลอกหน้า PDF ปัจจุบัน',
+                message: `คุณต้องการคัดลอกหน้า ${pageNum} เพื่อแทรกเป็นหน้าใหม่ (หน้าที่ ${pageNum + 1}) หรือไม่? (จำนวนหน้ารวมจะเปลี่ยนจาก ${totalPages} เป็น ${totalPages + 1} หน้า)`,
+                showCancel: true
+            });
+
+            if (!duplicateOption) return;
+
+            const currentCanvasData = pdfCanvas.toDataURL('image/png');
+
+            if (pagesList[pageNum - 1]) {
+                pagesList[pageNum - 1].dataUrl = currentCanvasData;
+            }
+
+            const newPageItem = {
+                pdfPageIndex: null,
+                dataUrl: currentCanvasData
+            };
+
+            pagesList.splice(pageNum, 0, newPageItem);
+            totalPages = pagesList.length;
+
+            placedTags.forEach(tag => {
+                if (tag.page > pageNum) {
+                    tag.page += 1;
+                }
+            });
+
+            await renderPage(pageNum + 1);
+            triggerAutoSave();
+            showToast(`คัดลอกหน้า ${pageNum} ไปยังหน้า ${pageNum + 1} เรียบร้อยแล้ว (รวม ${totalPages} หน้า)`, 'success');
+        }
+
+        /** Real-time Page Deletion Logic */
+        async function deleteCurrentPage() {
+            if (totalPages <= 1) {
+                showToast('โครงการต้องมีอย่างน้อย 1 หน้า ไม่สามารถลบได้', 'error');
+                return;
+            }
+
+            const confirmDelete = await showModal({
+                title: 'ยืนยันการลบหน้า PDF',
+                message: `คุณต้องการลบหน้า ${pageNum} หรือไม่? (รายการมาร์กทั้งหมดในหน้านี้จะถูกลบออกด้วย และหน้ารวมจะลดลงจาก ${totalPages} เหลือ ${totalPages - 1} หน้า)`,
+                showCancel: true
+            });
+
+            if (!confirmDelete) return;
+
+            const deletedPageNum = pageNum;
+
+            // 1. Remove target page item from pagesList array
+            pagesList.splice(deletedPageNum - 1, 1);
+            totalPages = pagesList.length;
+
+            // 2. Remove all tag markers associated with the deleted page
+            placedTags = placedTags.filter(tag => tag.page !== deletedPageNum);
+
+            // 3. Shift page numbers for all tags located on subsequent pages
+            placedTags.forEach(tag => {
+                if (tag.page > deletedPageNum) {
+                    tag.page -= 1;
+                }
+            });
+
+            // 4. Adjust active page pointer if we just deleted the last page
+            const targetPage = deletedPageNum > totalPages ? totalPages : deletedPageNum;
+
+            // 5. Re-render active page and update BOM
+            await renderPage(targetPage);
+            triggerAutoSave();
+            showToast(`ลบหน้า ${deletedPageNum} เรียบร้อยแล้ว (เหลือทั้งหมด ${totalPages} หน้า)`, 'success');
+        }
+
+        function findTagAtPosition(cx, cy) {
+            for (let i = placedTags.length - 1; i >= 0; i--) {
+                const tag = placedTags[i];
+                if (tag.page !== pageNum) continue;
+
+                if (tag.shape === 'circle') {
+                    if (Math.hypot(cx - tag.x, cy - tag.y) <= (tag.radius || 20)) return tag;
+                } else if (tag.shape === 'rectangle') {
+                    const minX = Math.min(tag.x, tag.x2), maxX = Math.max(tag.x, tag.x2);
+                    const minY = Math.min(tag.y, tag.y2), maxY = Math.max(tag.y, tag.y2);
+                    if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return tag;
+                } else if (tag.shape === 'line') {
+                    const minX = Math.min(tag.x, tag.x2) - 10, maxX = Math.max(tag.x, tag.x2) + 10;
+                    const minY = Math.min(tag.y, tag.y2) - 10, maxY = Math.max(tag.y, tag.y2) + 10;
+                    if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return tag;
+                }
+            }
+            return null;
+        }
+
+        function redrawMarkers() {
+            if (!markerCtx || !markerCanvas) return;
+            markerCtx.clearRect(0, 0, markerCanvas.width, markerCanvas.height);
+            let pageCount = 0;
+            placedTags.forEach(tag => {
+                if (tag.page === pageNum) {
+                    pageCount++;
+                    drawSingleMarker(markerCtx, tag, false, tag.id === selectedTagId);
+                }
+            });
+
+            if (tempShape) {
+                drawSingleMarker(markerCtx, tempShape, true, false);
+            }
+
+            const pageMarkEl = document.getElementById('page-mark-count');
+            if (pageMarkEl) pageMarkEl.textContent = pageCount;
+        }
+
+        function drawSingleMarker(ctx, tag, isTemp = false, isSelected = false) {
+            ctx.save();
+            ctx.strokeStyle = tag.color || '#ef4444';
+            ctx.fillStyle = tag.color || '#ef4444';
+            ctx.lineWidth = isSelected ? 3 : 2;
+
+            const metrics = computeShapeMetrics(tag);
+
+            if (tag.shape === 'circle') {
+                const r = tag.radius || 20;
+                ctx.beginPath();
+                ctx.arc(tag.x, tag.y, r, 0, 2 * Math.PI);
+                ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1.0; ctx.stroke();
+                
+                const labelText = `${tag.name} (${metrics.area.toFixed(2)} m²)`;
+                ctx.font = 'bold 12px Prompt, sans-serif';
+                const textWidth = ctx.measureText(labelText).width;
+                ctx.fillStyle = tag.color;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(tag.x - textWidth/2 - 6, tag.y - 10, textWidth + 12, 20, 4);
+                else ctx.rect(tag.x - textWidth/2 - 6, tag.y - 10, textWidth + 12, 20);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, tag.x, tag.y);
+
+            } else if (tag.shape === 'rectangle') {
+                const w = tag.x2 - tag.x;
+                const h = tag.y2 - tag.y;
+                ctx.globalAlpha = 0.2; ctx.fillRect(tag.x, tag.y, w, h); ctx.globalAlpha = 1.0; ctx.strokeRect(tag.x, tag.y, w, h);
+                const labelText = `${tag.name}: ${metrics.w}m x ${metrics.l}m (${metrics.area.toFixed(2)} m²)`;
+                ctx.font = 'bold 11px Prompt, sans-serif';
+                const textWidth = ctx.measureText(labelText).width;
+                ctx.fillStyle = tag.color;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(tag.x + w/2 - textWidth/2 - 6, tag.y + h/2 - 10, textWidth + 12, 20, 4);
+                else ctx.rect(tag.x + w/2 - textWidth/2 - 6, tag.y + h/2 - 10, textWidth + 12, 20);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, tag.x + w/2, tag.y + h/2);
+
+            } else if (tag.shape === 'line') {
+                ctx.beginPath(); ctx.moveTo(tag.x, tag.y); ctx.lineTo(tag.x2, tag.y2); ctx.stroke();
+                const labelText = `${tag.name}: ยาว ${metrics.l}m (${metrics.area.toFixed(2)} m²)`;
+                ctx.font = 'bold 11px Prompt, sans-serif';
+                const textWidth = ctx.measureText(labelText).width;
+                const midX = (tag.x + tag.x2) / 2, midY = (tag.y + tag.y2) / 2;
+                ctx.fillStyle = tag.color;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(midX - textWidth/2 - 6, midY - 18, textWidth + 12, 18, 4);
+                else ctx.rect(midX - textWidth/2 - 6, midY - 18, textWidth + 12, 18);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, midX, midY - 9);
+
+            } else if (tag.shape === 'polygon' && tag.points) {
+                ctx.beginPath();
+                ctx.moveTo(tag.points[0].x, tag.points[0].y);
+                for (let i = 1; i < tag.points.length; i++) ctx.lineTo(tag.points[i].x, tag.points[i].y);
+                if (!isTemp) ctx.closePath();
+                ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1.0; ctx.stroke();
+
+                if (tag.points.length > 0) {
+                    const labelText = `${tag.name} (${metrics.area.toFixed(2)} m², ยาว ${metrics.perimeter}m)`;
+                    ctx.font = 'bold 11px Prompt, sans-serif';
+                    const textWidth = ctx.measureText(labelText).width;
+                    ctx.fillStyle = tag.color;
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(tag.points[0].x - textWidth/2 - 6, tag.points[0].y - 20, textWidth + 12, 18, 4);
+                    else ctx.rect(tag.points[0].x - textWidth/2 - 6, tag.points[0].y - 20, textWidth + 12, 18);
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(labelText, tag.points[0].x, tag.points[0].y - 11);
+                }
+            }
+            ctx.restore();
+        }
+
+        function handleCanvasMouseDown(e) {
+            if (!pdfCanvas || !pdfCanvas.width) return;
+            if (e.button === 1 || activeTool === 'pan') {
+                isPanning = true;
+                panStartPos = { x: e.clientX - panX, y: e.clientY - panY };
+                return;
+            }
+            if (e.button !== 0) return;
+            const pos = getCanvasCoords(e);
+
+            if (activeTool === 'select') {
+                const hitTag = findTagAtPosition(pos.x, pos.y);
+                if (hitTag) {
+                    selectedTagId = hitTag.id;
+                    isDraggingTag = true;
+                    dragOffset = { x: pos.x - hitTag.x, y: pos.y - hitTag.y };
+                } else selectedTagId = null;
+                redrawMarkers(); updateBOMSummary();
+            } else if (activeTool === 'polygon') {
+                polygonPoints.push(pos);
+                tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'polygon', color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, points: polygonPoints };
+                redrawMarkers();
+            } else if (activeTool === 'line') {
+                if (!isDrawing) {
+                    isDrawing = true; drawStartPos = pos;
+                    tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'line', color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, x: pos.x, y: pos.y, x2: pos.x, y2: pos.y, isAutoScaled: autoCalcFromScale };
+                } else finalizeDrawing();
+            } else {
+                isDrawing = true; drawStartPos = pos;
+                tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: activeTool, color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, x: pos.x, y: pos.y, x2: pos.x, y2: pos.y, radius: 20, isAutoScaled: autoCalcFromScale };
+            }
+        }
+
+        function handleCanvasMouseMove(e) {
+            if (isPanning) {
+                panX = e.clientX - panStartPos.x; panY = e.clientY - panStartPos.y;
+                updateTransform(); return;
+            }
+            const pos = getCanvasCoords(e);
+            if (isDraggingTag && selectedTagId) {
+                const tag = placedTags.find(t => t.id === selectedTagId);
+                if (tag) {
+                    const dx = pos.x - dragOffset.x - tag.x, dy = pos.y - dragOffset.y - tag.y;
+                    tag.x += dx; tag.y += dy; tag.x2 += dx; tag.y2 += dy;
+                    redrawMarkers();
+                }
+            } else if (isDrawing && tempShape) {
+                tempShape.x2 = pos.x; tempShape.y2 = pos.y;
+                if (tempShape.shape === 'circle') tempShape.radius = Math.max(10, Math.hypot(pos.x - tempShape.x, pos.y - tempShape.y));
+                redrawMarkers();
+            }
+        }
+
+        function handleCanvasMouseUp() {
+            if (isPanning) { isPanning = false; return; }
+            if (isDraggingTag) { isDraggingTag = false; triggerAutoSave(); return; }
+            if (activeTool === 'line' || activeTool === 'polygon') return;
+            if (isDrawing && tempShape) finalizeDrawing();
+        }
+
+        function finalizeDrawing() {
+            if (!tempShape) return;
+            isDrawing = false;
+            if (autoCalcFromScale && tempShape.shape !== 'polygon') {
+                const metrics = computeShapeMetrics(tempShape);
+                tempShape.w = metrics.w; tempShape.l = metrics.l;
+            }
+            placedTags.push({ ...tempShape });
+            selectedTagId = tempShape.id;
+            tempShape = null; polygonPoints = [];
+            redrawMarkers(); updateBOMSummary(); renderPresets(); triggerAutoSave();
+        }
+
+        function updateBOMSummary() {
+            const tableBody = document.getElementById('bom-table-body');
+            const emptyMsg = document.getElementById('bom-empty-msg');
+            const itemsList = document.getElementById('placed-tags-list');
+            const countCurrentEl = document.getElementById('count-bom-current');
+            const countAllEl = document.getElementById('count-bom-all');
+            const totalItemsCount = document.getElementById('total-items-count');
+
+            if (!tableBody || !itemsList) return;
+            tableBody.innerHTML = ''; itemsList.innerHTML = '';
+
+            const currentTags = placedTags.filter(t => t.page === pageNum);
+            if (countCurrentEl) countCurrentEl.textContent = currentTags.length;
+            if (countAllEl) countAllEl.textContent = placedTags.length;
+            if (totalItemsCount) totalItemsCount.textContent = placedTags.length;
+
+            const tagsToDisplay = bomViewScope === 'current' ? currentTags : placedTags;
+
+            if (tagsToDisplay.length === 0) {
+                if (emptyMsg) emptyMsg.classList.remove('hidden'); return;
+            }
+            if (emptyMsg) emptyMsg.classList.add('hidden');
+
+            const summaryMap = {};
+            tagsToDisplay.forEach(tag => {
+                const metrics = computeShapeMetrics(tag);
+                const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
+                if (!summaryMap[key]) {
+                    summaryMap[key] = {
+                        name: tag.name, shape: tag.shape, color: tag.color,
+                        w: metrics.w, l: metrics.l, h: metrics.h,
+                        totalArea: 0, count: 0
+                    };
+                }
+                summaryMap[key].count += 1;
+                summaryMap[key].totalArea += metrics.area;
+            });
+
+            Object.values(summaryMap).forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                const shapeIcon = item.shape === 'circle' ? 'fa-circle' : item.shape === 'rectangle' ? 'fa-square' : item.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
+                const shapeText = item.shape === 'circle' ? 'วงกลม' : item.shape === 'rectangle' ? 'สี่เหลี่ยม' : item.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง';
+
+                tr.innerHTML = `
+                    <td class="py-2.5 font-bold flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${item.color}"></span>
+                        <span>${item.name}</span>
+                    </td>
+                    <td class="py-2.5 text-slate-600"><i class="fa-regular ${shapeIcon} text-[10px] mr-1"></i>${shapeText}</td>
+                    <td class="py-2.5 font-mono text-[11px] text-slate-600">${item.w} x ${item.l} x ${item.h}</td>
+                    <td class="py-2.5 font-mono text-right font-bold text-slate-800">${item.totalArea.toFixed(2)} m²</td>
+                    <td class="py-2.5 text-right font-bold text-blue-600 text-sm">${item.count}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            tagsToDisplay.forEach((tag, idx) => {
+                const metrics = computeShapeMetrics(tag);
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `flex items-center justify-between p-1.5 rounded text-xs border ${tag.id === selectedTagId ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-200'} cursor-pointer`;
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
+                        <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.name}</span>
+                        <span class="text-[10px] text-slate-500 truncate">(หน้า ${tag.page} - ${metrics.area.toFixed(2)} m²)</span>
+                    </div>
+                    <button class="btn-del-tag text-red-500 hover:text-red-700 px-1" data-id="${tag.id}"><i class="fa-solid fa-xmark"></i></button>
+                `;
+                itemDiv.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-del-tag')) return;
+                    selectedTagId = tag.id;
+                    if (tag.page !== pageNum) renderPage(tag.page);
+                    else redrawMarkers();
+                });
+                itemDiv.querySelector('.btn-del-tag').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    placedTags = placedTags.filter(t => t.id !== tag.id);
+                    if (selectedTagId === tag.id) selectedTagId = null;
+                    redrawMarkers(); updateBOMSummary(); triggerAutoSave();
+                });
+                itemsList.appendChild(itemDiv);
+            });
+        }
+
+        function renderPresets() {
+            const listContainer = document.getElementById('presets-list');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+            tagPresets.forEach(preset => {
+                const btn = document.createElement('div');
+                btn.className = `p-2 rounded-lg border flex items-center justify-between cursor-pointer transition ${activeTagConfig.name === preset.name ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`;
+                const shapeIcon = preset.shape === 'circle' ? 'fa-circle' : preset.shape === 'rectangle' ? 'fa-square' : 'fa-slash';
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm" style="background-color: ${preset.color}"></span>
+                        <div>
+                            <div class="font-bold text-xs text-slate-800 flex items-center gap-1">
+                                <span>${preset.name}</span>
+                                <i class="fa-regular ${shapeIcon} text-[10px] text-slate-400"></i>
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono">${preset.w} x ${preset.l} x ${preset.h} m</div>
+                        </div>
+                    </div>
+                    <button class="btn-del-preset text-slate-300 hover:text-red-500 p-1"><i class="fa-solid fa-trash-can text-[11px]"></i></button>
+                `;
+                btn.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-del-preset')) return;
+                    activeTagConfig = { ...preset };
+                    updateActiveTagUI(); setTool(preset.shape);
+                });
+                btn.querySelector('.btn-del-preset').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tagPresets = tagPresets.filter(p => p.id !== preset.id);
+                    renderPresets(); triggerAutoSave();
+                });
+                listContainer.appendChild(btn);
+            });
+        }
+
+        function updateActiveTagUI() {
+            const tagInput = document.getElementById('tag-name-input');
+            const colInput = document.getElementById('tag-color-input');
+            const hexInput = document.getElementById('tag-color-hex');
+            const wInput = document.getElementById('dim-w-input');
+            const lInput = document.getElementById('dim-l-input');
+            const hInput = document.getElementById('dim-h-input');
+            const prevEl = document.getElementById('active-tag-preview');
+
+            if (tagInput) tagInput.value = activeTagConfig.name;
+            if (colInput) colInput.value = activeTagConfig.color;
+            if (hexInput) hexInput.value = activeTagConfig.color;
+            if (wInput) wInput.value = activeTagConfig.w;
+            if (lInput) lInput.value = activeTagConfig.l;
+            if (hInput) hInput.value = activeTagConfig.h;
+            if (prevEl) prevEl.style.backgroundColor = activeTagConfig.color;
+        }
+
+        function setTool(toolName) {
+            activeTool = toolName;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                if (btn.dataset.tool === toolName) {
+                    btn.classList.add('active', 'bg-blue-50', 'border-blue-500', 'text-blue-700');
+                    btn.classList.remove('bg-white', 'border-slate-200', 'text-slate-700');
+                } else {
+                    btn.classList.remove('active', 'bg-blue-50', 'border-blue-500', 'text-blue-700');
+                    btn.classList.add('bg-white', 'border-slate-200', 'text-slate-700');
+                }
+            });
+            const statusEl = document.getElementById('tool-status');
+            if (statusEl) statusEl.innerHTML = `โหมด: ${toolName}`;
+            if (canvasWrapper) {
+                canvasWrapper.style.cursor = toolName === 'pan' ? 'grab' : toolName === 'select' ? 'default' : 'crosshair';
+            }
+        }
+
+        function saveProjectJSON() {
+            const projectData = {
+                version: '5.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
+                autoCalcFromScale, tagPresets, activeTagConfig, placedTags, pagesList
+            };
+            const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `${activeFileName}_project.json`; a.click();
+            URL.revokeObjectURL(url);
+            showToast('บันทึกโครงการ (.json) สำเร็จ', 'success');
+        }
+
+        function loadProjectJSON(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    activeFileName = data.activeFileName || "blueprint";
+                    pageNum = data.pageNum || 1;
+                    pixelsPerMeter = data.pixelsPerMeter || 100;
+                    autoCalcFromScale = data.autoCalcFromScale !== undefined ? data.autoCalcFromScale : true;
+                    tagPresets = data.tagPresets || tagPresets;
+                    activeTagConfig = data.activeTagConfig || activeTagConfig;
+                    placedTags = data.placedTags || [];
+                    pagesList = data.pagesList || [];
+                    totalPages = pagesList.length || data.totalPages || 1;
+
+                    updateScaleUIBadges(); renderPresets(); updateActiveTagUI();
+                    await renderPage(pageNum);
+                    if (emptyState) emptyState.classList.add('hidden');
+                    showToast('เปิดโครงการสำเร็จ', 'success');
+                } catch (err) { showToast('ไฟล์โครงการไม่ถูกต้อง', 'error'); }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportToExcel() {
+            if (placedTags.length === 0) { showToast('ไม่มีข้อมูลสำหรับส่งออก', 'error'); return; }
+            const excelRows = [];
+            const summaryMap = {};
+            placedTags.forEach(tag => {
+                const metrics = computeShapeMetrics(tag);
+                const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
+                if (!summaryMap[key]) {
+                    summaryMap[key] = {
+                        name: tag.name,
+                        shape: tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
+                        w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, count: 0
+                    };
+                }
+                summaryMap[key].count += 1;
+                summaryMap[key].totalArea += metrics.area;
+            });
+
+            Object.values(summaryMap).forEach((item, idx) => {
+                excelRows.push({
+                    'ลำดับ': idx + 1, 'รหัสแท๊ก': item.name, 'รูปทรง': item.shape,
+                    'ความกว้าง (m)': item.w, 'ความยาว (m)': item.l, 'ความสูง (m)': item.h,
+                    'พื้นที่รวม (m²)': item.totalArea.toFixed(2), 'จำนวน': item.count
+                });
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(excelRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "BOM Summary");
+            XLSX.writeFile(workbook, `BOM_Summary_${activeFileName}.xlsx`);
+            showToast('ส่งออกไฟล์ Excel เรียบร้อย', 'success');
+        }
+
+        function openPrintModal() {
+            if (!pdfCanvas || !pdfCanvas.width) { showToast('กรุณาเปิดแบบแปลนก่อนพิมพ์', 'error'); return; }
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = pdfCanvas.width; tempCanvas.height = pdfCanvas.height;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(pdfCanvas, 0, 0); tCtx.drawImage(markerCanvas, 0, 0);
+
+            const printImg = document.getElementById('print-canvas-img');
+            if (printImg) printImg.src = tempCanvas.toDataURL('image/png');
+            document.querySelectorAll('.print-date').forEach(el => el.textContent = new Date().toLocaleDateString('th-TH'));
+            document.querySelectorAll('.print-filename').forEach(el => el.textContent = activeFileName);
+
+            const printTableBody = document.getElementById('print-table-body');
+            if (!printTableBody) return;
+            printTableBody.innerHTML = '';
+            const summaryMap = {};
+            placedTags.forEach(tag => {
+                const metrics = computeShapeMetrics(tag);
+                const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
+                if (!summaryMap[key]) {
+                    summaryMap[key] = {
+                        name: tag.name, shape: tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : 'เส้นตรง',
+                        w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, count: 0
+                    };
+                }
+                summaryMap[key].count += 1; summaryMap[key].totalArea += metrics.area;
+            });
+
+            Object.values(summaryMap).forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-200';
+                tr.innerHTML = `
+                    <td class="p-2 border-r border-slate-200 text-center">${idx + 1}</td>
+                    <td class="p-2 border-r border-slate-200 font-bold">${item.name}</td>
+                    <td class="p-2 border-r border-slate-200">${item.shape}</td>
+                    <td class="p-2 border-r border-slate-200 font-mono">${item.w} x ${item.l} x ${item.h}</td>
+                    <td class="p-2 border-r border-slate-200 text-right font-mono font-bold">${item.totalArea.toFixed(2)} m²</td>
+                    <td class="p-2 text-right font-bold text-blue-600">${item.count}</td>
+                `;
+                printTableBody.appendChild(tr);
+            });
+            const printModal = document.getElementById('print-modal');
+            if (printModal) printModal.classList.remove('hidden');
+        }
+
+        function setupEventListeners() {
+            initDOMElements();
+
+            document.getElementById('file-input')?.addEventListener('change', (e) => loadBlueprintFile(e.target.files[0]));
+            document.getElementById('empty-file-input')?.addEventListener('change', (e) => loadBlueprintFile(e.target.files[0]));
+            document.getElementById('project-file-input')?.addEventListener('change', (e) => loadProjectJSON(e.target.files[0]));
+            document.getElementById('empty-project-input')?.addEventListener('change', (e) => loadProjectJSON(e.target.files[0]));
+
+            document.getElementById('btn-save-project')?.addEventListener('click', saveProjectJSON);
+            document.getElementById('btn-prev-page')?.addEventListener('click', () => { if (pageNum > 1) renderPage(pageNum - 1); });
+            document.getElementById('btn-next-page')?.addEventListener('click', () => { if (pageNum < totalPages) renderPage(pageNum + 1); });
+            document.getElementById('btn-duplicate-page')?.addEventListener('click', duplicateCurrentPage);
+            document.getElementById('btn-delete-page')?.addEventListener('click', deleteCurrentPage);
+
+            document.getElementById('btn-zoom-in')?.addEventListener('click', () => { zoomScale = Math.min(zoomScale * 1.2, 5.0); updateTransform(); });
+            document.getElementById('btn-zoom-out')?.addEventListener('click', () => { zoomScale = Math.max(zoomScale * 0.8, 0.2); updateTransform(); });
+            document.getElementById('btn-zoom-fit')?.addEventListener('click', fitToScreen);
+            document.getElementById('btn-zoom-reset')?.addEventListener('click', resetZoom);
+
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+
+            document.getElementById('tab-bom-current')?.addEventListener('click', () => {
+                bomViewScope = 'current';
+                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
+                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                updateBOMSummary();
+            });
+            document.getElementById('tab-bom-all')?.addEventListener('click', () => {
+                bomViewScope = 'all';
+                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
+                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                updateBOMSummary();
+            });
+
+            document.getElementById('auto-calc-toggle')?.addEventListener('change', (e) => {
+                autoCalcFromScale = e.target.checked;
+                const dimHint = document.getElementById('dim-calc-hint');
+                if (dimHint) {
+                    dimHint.textContent = autoCalcFromScale ? '* ขนาด กว้าง x ยาว จะถูกคำนวณอัตโนมัติจากการลากรูปทรง' : '* โหมดกำหนดขนาดเองจากตัวเลขด้านบน';
+                }
+            });
+
+            document.getElementById('btn-add-preset')?.addEventListener('click', () => {
+                tagPresets.push({ id: 'p_' + Date.now(), ...activeTagConfig });
+                renderPresets(); triggerAutoSave();
+            });
+
+            document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
+                if (await showModal({ title: 'ยืนยันการลบ', message: 'ต้องการลบรายการมาร์กทั้งหมดหรือไม่?', showCancel: true })) {
+                    placedTags = []; selectedTagId = null; redrawMarkers(); updateBOMSummary(); triggerAutoSave();
+                }
+            });
+
+            document.getElementById('btn-export-excel')?.addEventListener('click', exportToExcel);
+            document.getElementById('btn-export-pdf')?.addEventListener('click', openPrintModal);
+            document.getElementById('btn-close-print-modal')?.addEventListener('click', () => document.getElementById('print-modal').classList.add('hidden'));
+            document.getElementById('btn-do-print')?.addEventListener('click', () => window.print());
+
+            if (canvasWrapper) {
+                canvasWrapper.addEventListener('mousedown', handleCanvasMouseDown);
+                window.addEventListener('mousemove', handleCanvasMouseMove);
+                window.addEventListener('mouseup', handleCanvasMouseUp);
+                canvasWrapper.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const rect = canvasWrapper.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+                    const newScale = Math.min(Math.max(0.2, zoomScale * (e.deltaY < 0 ? 1.15 : 0.85)), 5.0);
+                    panX = mouseX - (mouseX - panX) * (newScale / zoomScale);
+                    panY = mouseY - (mouseY - panY) * (newScale / zoomScale);
+                    zoomScale = newScale; updateTransform();
+                }, { passive: false });
+            }
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && activeTool === 'polygon' && polygonPoints.length > 2) finalizeDrawing();
+                if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTagId && document.activeElement.tagName !== 'INPUT') {
+                    placedTags = placedTags.filter(t => t.id !== selectedTagId);
+                    selectedTagId = null; redrawMarkers(); updateBOMSummary(); triggerAutoSave();
+                }
+            });
+        }
+
+        window.addEventListener('load', async () => {
+            setupEventListeners(); updateScaleUIBadges();
+            await initIndexedDB(); renderPresets(); updateActiveTagUI();
+        });
+    </script>
+</body>
+</html>
