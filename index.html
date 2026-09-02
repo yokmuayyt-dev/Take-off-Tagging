@@ -73,7 +73,7 @@
                 <input type="file" id="file-input" accept="application/pdf,image/*" class="hidden">
             </label>
 
-            <!-- Page Navigation & Page Manipulation Controls -->
+            <!-- Page Navigation & Page Insertion/Deletion Controls -->
             <div id="page-controls" class="hidden flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1">
                 <button id="btn-prev-page" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40" title="หน้าก่อนหน้า">
                     <i class="fa-solid fa-chevron-left"></i>
@@ -127,7 +127,7 @@
                 <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
                     <i class="fa-solid fa-toolbox"></i> เครื่องมือมาร์ก (Drawing Tools)
                 </h2>
-                <div class="grid grid-cols-6 gap-1">
+                <div class="grid grid-cols-7 gap-1">
                     <button data-tool="select" class="tool-btn active bg-blue-50 border-blue-500 text-blue-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลือก/ย้าย">
                         <i class="fa-solid fa-hand-pointer text-xs mb-1"></i>
                         <span>เลือก/ย้าย</span>
@@ -135,6 +135,10 @@
                     <button data-tool="pan" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลื่อนมุมมอง">
                         <i class="fa-solid fa-up-down-left-right text-xs mb-1"></i>
                         <span>เลื่อน</span>
+                    </button>
+                    <button data-tool="scale" class="tool-btn bg-white border-slate-200 text-amber-600 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="ตั้งสเกลแปลน (Calibrate Scale)">
+                        <i class="fa-solid fa-ruler-combined text-xs mb-1"></i>
+                        <span>ตั้งสเกล</span>
                     </button>
                     <button data-tool="circle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="วงกลม">
                         <i class="fa-regular fa-circle text-xs mb-1"></i>
@@ -193,7 +197,12 @@
                 <div>
                     <div class="flex justify-between items-center mb-1">
                         <label class="block text-xs text-slate-600">ขนาดระบุในแบบ (กว้าง x ยาว x สูง)</label>
-                        <span id="scale-info-badge" class="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-mono">1m = 100px</span>
+                        <div class="flex items-center gap-1">
+                            <span id="scale-info-badge" class="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-mono">1m = 100px</span>
+                            <button id="btn-quick-scale" class="text-[10px] bg-amber-500 hover:bg-amber-600 text-white px-1.5 py-0.5 rounded font-medium transition shadow-sm flex items-center gap-1" title="ลากเส้นตั้งสเกลแปลน">
+                                <i class="fa-solid fa-ruler-combined"></i> ตั้งสเกล
+                            </button>
+                        </div>
                     </div>
                     <div class="grid grid-cols-3 gap-1">
                         <input type="text" id="dim-w-input" value="1.00" placeholder="กว้าง" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
@@ -747,7 +756,6 @@
             }
         }
 
-        /** Real-time Page Insertion Logic */
         async function duplicateCurrentPage() {
             if (!pdfCanvas || !pdfCanvas.width || pagesList.length === 0) return;
 
@@ -784,7 +792,6 @@
             showToast(`คัดลอกหน้า ${pageNum} ไปยังหน้า ${pageNum + 1} เรียบร้อยแล้ว (รวม ${totalPages} หน้า)`, 'success');
         }
 
-        /** Real-time Page Deletion Logic */
         async function deleteCurrentPage() {
             if (totalPages <= 1) {
                 showToast('โครงการต้องมีอย่างน้อย 1 หน้า ไม่สามารถลบได้', 'error');
@@ -869,6 +876,36 @@
             ctx.fillStyle = tag.color || '#ef4444';
             ctx.lineWidth = isSelected ? 3 : 2;
 
+            if (tag.shape === 'scale') {
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([6, 3]);
+                ctx.beginPath();
+                ctx.moveTo(tag.x, tag.y);
+                ctx.lineTo(tag.x2, tag.y2);
+                ctx.stroke();
+
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath(); ctx.arc(tag.x, tag.y, 5, 0, 2 * Math.PI); ctx.fill();
+                ctx.beginPath(); ctx.arc(tag.x2, tag.y2, 5, 0, 2 * Math.PI); ctx.fill();
+
+                const lenPx = Math.hypot(tag.x2 - tag.x, tag.y2 - tag.y);
+                const labelText = `ตั้งสเกล: ${lenPx.toFixed(1)} px`;
+                ctx.font = 'bold 12px Prompt, sans-serif';
+                const textWidth = ctx.measureText(labelText).width;
+                const midX = (tag.x + tag.x2) / 2, midY = (tag.y + tag.y2) / 2;
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(midX - textWidth/2 - 6, midY - 20, textWidth + 12, 20, 4);
+                else ctx.rect(midX - textWidth/2 - 6, midY - 20, textWidth + 12, 20);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, midX, midY - 10);
+                ctx.restore();
+                return;
+            }
+
             const metrics = computeShapeMetrics(tag);
 
             if (tag.shape === 'circle') {
@@ -950,6 +987,13 @@
             if (e.button !== 0) return;
             const pos = getCanvasCoords(e);
 
+            if (activeTool === 'scale') {
+                isDrawing = true;
+                drawStartPos = pos;
+                tempShape = { shape: 'scale', x: pos.x, y: pos.y, x2: pos.x, y2: pos.y, color: '#f59e0b' };
+                return;
+            }
+
             if (activeTool === 'select') {
                 const hitTag = findTagAtPosition(pos.x, pos.y);
                 if (hitTag) {
@@ -996,6 +1040,36 @@
         function handleCanvasMouseUp() {
             if (isPanning) { isPanning = false; return; }
             if (isDraggingTag) { isDraggingTag = false; triggerAutoSave(); return; }
+
+            if (isDrawing && tempShape && tempShape.shape === 'scale') {
+                isDrawing = false;
+                const pxLen = Math.hypot(tempShape.x2 - tempShape.x, tempShape.y2 - tempShape.y);
+                tempShape = null;
+                redrawMarkers();
+
+                if (pxLen > 10) {
+                    showModal({
+                        title: 'ตั้งสเกลแบบแปลน (Scale Calibration)',
+                        message: `ระยะที่ลากบนภาพเท่ากับ ${pxLen.toFixed(1)} px กรุณาระบุระยะทางจริงของเส้นนี้ (หน่วยเมตร):`,
+                        showInput: true,
+                        inputValue: '1.00',
+                        showCancel: true
+                    }).then(val => {
+                        if (val && !isNaN(val) && parseFloat(val) > 0) {
+                            const realMeters = parseFloat(val);
+                            pixelsPerMeter = pxLen / realMeters;
+                            updateScaleUIBadges();
+                            redrawMarkers();
+                            updateBOMSummary();
+                            triggerAutoSave();
+                            showToast(`ตั้งสเกลสำเร็จ: 1 เมตร = ${pixelsPerMeter.toFixed(2)} px`, 'success');
+                            setTool('select');
+                        }
+                    });
+                }
+                return;
+            }
+
             if (activeTool === 'line' || activeTool === 'polygon') return;
             if (isDrawing && tempShape) finalizeDrawing();
         }
@@ -1287,6 +1361,11 @@
 
         function setupEventListeners() {
             initDOMElements();
+
+            document.getElementById('btn-quick-scale')?.addEventListener('click', () => {
+                setTool('scale');
+                showToast('คลิกลากเส้นบนแบบแปลนตรงระยะที่ทราบค่าจริง เพื่อกำหนดสเกล', 'info');
+            });
 
             document.getElementById('file-input')?.addEventListener('change', (e) => loadBlueprintFile(e.target.files[0]));
             document.getElementById('empty-file-input')?.addEventListener('change', (e) => loadBlueprintFile(e.target.files[0]));
