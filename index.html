@@ -24,6 +24,7 @@
         #canvas-container { transform-origin: 0 0; position: absolute; top: 0; left: 0; }
         .toast-enter { transform: translateY(100%); opacity: 0; }
         .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease-out; }
+        .thumb-card.active { border-color: #2563eb; background-color: #eff6ff; ring: 2px; ring-color: #3b82f6; }
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
@@ -35,7 +36,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden">
 
-    <!-- Top Navigation Bar -->
+    <!-- Top Navigation Header Bar -->
     <header class="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between shadow-md z-30 no-print">
         <div class="flex items-center space-x-3">
             <div class="bg-blue-600 text-white p-2 rounded-lg font-bold flex items-center justify-center w-9 h-9">
@@ -53,7 +54,7 @@
             </div>
         </div>
 
-        <!-- Document / Project Controls & Undo/Redo Buttons -->
+        <!-- Document / Project Controls & Undo/Redo/Page Navigation -->
         <div class="flex items-center space-x-2">
             <!-- Undo & Redo Controls -->
             <div class="flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1">
@@ -87,8 +88,15 @@
                 <input type="file" id="file-input" accept="application/pdf,image/*" class="hidden">
             </label>
 
-            <!-- Page Navigation & Controls -->
+            <!-- Page Navigation Controls -->
             <div id="page-controls" class="hidden flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1">
+                <button id="btn-toggle-thumbs" class="bg-slate-700 hover:bg-slate-600 text-amber-300 px-2 py-1 rounded transition flex items-center gap-1 text-[11px]" title="ซ่อน/แสดงรูปย่อยหน้า PDF">
+                    <i class="fa-solid fa-images"></i>
+                    <span>รูปย่อย</span>
+                </button>
+
+                <div class="h-4 w-px bg-slate-700 mx-0.5"></div>
+
                 <button id="btn-prev-page" class="px-2 py-1 hover:bg-slate-700 rounded text-slate-300 disabled:opacity-40" title="หน้าก่อนหน้า">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -99,6 +107,16 @@
 
                 <div class="h-4 w-px bg-slate-700 mx-0.5"></div>
 
+                <!-- Page Category Selector -->
+                <div class="flex items-center gap-1 px-1 bg-slate-900/60 rounded border border-slate-700/80">
+                    <i class="fa-solid fa-folder-tree text-amber-400 text-[10px]"></i>
+                    <select id="page-category-select" class="bg-transparent text-amber-300 text-[11px] font-medium py-1 focus:outline-none cursor-pointer" title="กำหนดหมวดหมู่ให้หน้าแปลนนี้">
+                        <option value="ทั่วไป" class="bg-slate-800 text-white">หมวด: ทั่วไป</option>
+                    </select>
+                </div>
+
+                <div class="h-4 w-px bg-slate-700 mx-0.5"></div>
+
                 <button id="btn-duplicate-page" class="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 rounded transition flex items-center gap-1 text-[11px]" title="คัดลอกหน้าปัจจุบันและแทรกเป็นหน้าถัดไป">
                     <i class="fa-solid fa-copy"></i>
                     <span>คัดลอกหน้านี้</span>
@@ -106,6 +124,20 @@
                 <button id="btn-delete-page" class="bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded transition flex items-center gap-1 text-[11px]" title="ลบหน้าปัจจุบันออกจากโครงการ">
                     <i class="fa-solid fa-trash-can"></i>
                     <span>ลบหน้านี้</span>
+                </button>
+            </div>
+
+            <div class="h-5 w-px bg-slate-700 mx-1"></div>
+
+            <!-- Global Category Filter Dropdown -->
+            <div class="flex items-center bg-slate-800 rounded-lg p-1 text-xs border border-slate-700 gap-1.5">
+                <span class="text-slate-400 text-[11px] pl-1"><i class="fa-solid fa-filter text-blue-400"></i> ดูเฉพาะหมวด:</span>
+                <select id="global-category-filter" class="bg-slate-900 text-amber-300 text-xs rounded px-2 py-1 border border-slate-700 focus:outline-none focus:border-amber-500 cursor-pointer font-medium">
+                    <option value="all">ทั้งหมด (ทุกหมวดหมู่)</option>
+                </select>
+                <button id="btn-manage-categories" class="bg-slate-700 hover:bg-slate-600 text-amber-300 px-2 py-1 rounded text-[11px] transition flex items-center gap-1" title="จัดการหมวดหมู่งาน">
+                    <i class="fa-solid fa-tags"></i>
+                    <span>จัดการหมวด</span>
                 </button>
             </div>
 
@@ -133,17 +165,34 @@
         </div>
     </header>
 
-    <!-- Main Workspace Container -->
+    <!-- Main Workspace Layout -->
     <div class="flex-1 flex overflow-hidden">
-        <!-- Left Sidebar: Tools & Presets -->
+        
+        <!-- Collapsible PDF Thumbnails Sidebar Panel -->
+        <aside id="thumbs-sidebar" class="w-48 bg-slate-900 border-r border-slate-800 flex flex-col z-20 shadow-lg no-print transition-all duration-200">
+            <div class="p-2.5 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
+                <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-images text-amber-400"></i> รูปย่อยแบบแปลน
+                </span>
+                <span id="thumbs-count-badge" class="text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded border border-slate-700 font-mono">0 หน้า</span>
+            </div>
+            <div id="thumbs-container" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <div class="text-center text-slate-500 text-xs py-8">
+                    <i class="fa-solid fa-file-pdf text-2xl mb-2 text-slate-700 block"></i>
+                    ยังไม่มีหน้าแปลน
+                </div>
+            </div>
+        </aside>
+
+        <!-- Left Sidebar: Drawing Tools & Inspector Controls -->
         <aside class="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm no-print">
             <div class="p-3 border-b border-slate-200 bg-slate-50">
                 <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
                     <i class="fa-solid fa-toolbox"></i> เครื่องมือมาร์ก (Drawing Tools)
                 </h2>
-                <!-- Tools Grid including Count Tool -->
-                <div class="grid grid-cols-4 gap-1">
-                    <button data-tool="select" class="tool-btn active bg-blue-50 border-blue-500 text-blue-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลือก/ย้าย">
+                <!-- Tools Grid including Text Tool & Count Tool -->
+                <div class="grid grid-cols-3 gap-1">
+                    <button data-tool="select" class="tool-btn active bg-blue-50 border-blue-500 text-blue-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เลือก/ย้ายวัตถุ (Ctrl+C / Ctrl+V เพื่อคัดลอก/วาง)">
                         <i class="fa-solid fa-hand-pointer text-xs mb-1"></i>
                         <span>เลือก/ย้าย</span>
                     </button>
@@ -155,34 +204,38 @@
                         <i class="fa-solid fa-ruler-combined text-xs mb-1"></i>
                         <span>ตั้งสเกล</span>
                     </button>
+                    <button data-tool="text" class="tool-btn bg-white border-slate-200 text-purple-600 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="พิมพ์ข้อความ (ไทย/ENG)">
+                        <i class="fa-solid fa-font text-xs mb-1"></i>
+                        <span>ข้อความ</span>
+                    </button>
                     <button data-tool="count" class="tool-btn bg-white border-slate-200 text-rose-600 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="นับจำนวน (คลิกบนแปลนเพื่อปักมาร์ก +1 ทันที)">
                         <i class="fa-solid fa-hashtag text-xs mb-1"></i>
                         <span>นับจำนวน</span>
                     </button>
-                    <button data-tool="circle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="วงกลม">
+                    <button data-tool="circle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="วงกลม (คลิกลาก หรือระบุขนาดแล้วคลิกวาง)">
                         <i class="fa-regular fa-circle text-xs mb-1"></i>
                         <span>วงกลม</span>
                     </button>
-                    <button data-tool="rectangle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="สี่เหลี่ยม">
+                    <button data-tool="rectangle" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="สี่เหลี่ยม (คลิกลาก หรือระบุขนาดแล้วคลิกวาง)">
                         <i class="fa-regular fa-square text-xs mb-1"></i>
                         <span>สี่เหลี่ยม</span>
                     </button>
-                    <button data-tool="line" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เส้นตรง">
+                    <button data-tool="line" class="tool-btn bg-white border-slate-200 text-slate-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="เส้นตรง (คลิกลาก หรือระบุความยาวแล้วคลิกวาง)">
                         <i class="fa-solid fa-slash text-xs mb-1"></i>
                         <span>เส้นตรง</span>
                     </button>
-                    <button data-tool="polygon" class="tool-btn bg-white border-slate-200 text-indigo-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="หลายเหลี่ยม">
+                    <button data-tool="polygon" class="tool-btn bg-white border-slate-200 text-indigo-700 flex flex-col items-center justify-center p-1 rounded-lg border text-[10px] font-medium transition" title="หลายเหลี่ยม (คลิกบรรจบจุดแรกเพื่อปิดรูป)">
                         <i class="fa-solid fa-draw-polygon text-xs mb-1"></i>
                         <span>หลายเหลี่ยม</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Active Tag Setup -->
+            <!-- Active Tag Setup & Inspector Controls -->
             <div class="p-3 border-b border-slate-200 space-y-3">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                        <i class="fa-solid fa-sliders"></i> ตั้งค่าแท๊กปัจจุบัน
+                        <i class="fa-solid fa-sliders"></i> ตั้งค่าแท๊ก / ปรับขนาดวัตถุ
                     </h2>
                     <span id="active-tag-preview" class="inline-block w-4 h-4 rounded-full border border-slate-300 shadow-sm" style="background-color: #ef4444;"></span>
                 </div>
@@ -213,6 +266,42 @@
                     </div>
                 </div>
 
+                <!-- Text Control Panel -->
+                <div id="text-tool-options" class="p-2 bg-purple-50 rounded-lg border border-purple-200 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-bold text-purple-900 flex items-center gap-1">
+                            <i class="fa-solid fa-text-height"></i> ปรับขนาดตัวอักษร (Text Size)
+                        </label>
+                        <div class="flex items-center gap-1">
+                            <button id="btn-text-dec" class="w-6 h-6 bg-purple-200 hover:bg-purple-300 text-purple-900 rounded font-bold text-xs flex items-center justify-center shadow-sm" title="ลดขนาดตัวอักษร">-</button>
+                            <span id="text-size-display" class="font-mono text-xs font-bold text-purple-900 px-1">20px</span>
+                            <button id="btn-text-inc" class="w-6 h-6 bg-purple-200 hover:bg-purple-300 text-purple-900 rounded font-bold text-xs flex items-center justify-center shadow-sm" title="เพิ่มขนาดตัวอักษร">+</button>
+                        </div>
+                    </div>
+                    <select id="text-size-input" class="w-full text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-purple-500">
+                        <option value="14">14 px (เล็กมาก)</option>
+                        <option value="16">16 px (ขนาดเล็ก)</option>
+                        <option value="20" selected>20 px (ขนาดปกติ)</option>
+                        <option value="28">28 px (ขนาดใหญ่)</option>
+                        <option value="36">36 px (หัวข้อ)</option>
+                        <option value="48">48 px (ตัวใหญ่พิเศษ)</option>
+                        <option value="64">64 px (ขนาดจัมโบ้)</option>
+                    </select>
+                </div>
+
+                <!-- Category Selector for Tag -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-slate-600">หมวดหมู่งาน (Category)</label>
+                        <button id="btn-quick-add-cat" class="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                            <i class="fa-solid fa-plus text-[9px]"></i> เพิ่มหมวดใหม่
+                        </button>
+                    </div>
+                    <select id="tag-category-input" class="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-slate-50 focus:outline-none focus:border-blue-500 font-medium cursor-pointer">
+                        <option value="ทั่วไป">ทั่วไป</option>
+                    </select>
+                </div>
+
                 <div>
                     <div class="flex justify-between items-center mb-1">
                         <label class="block text-xs text-slate-600">ขนาดระบุในแบบ (กว้าง x ยาว x สูง)</label>
@@ -228,13 +317,13 @@
                         <input type="text" id="dim-l-input" value="" placeholder="ยาว (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
                         <input type="text" id="dim-h-input" value="" placeholder="สูง/ลึก (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
                     </div>
-                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* หากเว้นว่าง ขนาด กว้าง x ยาว จะคำนวณอัตโนมัติเมื่อเปิดสเกล</p>
+                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* หากระบุขนาดสี่เหลี่ยม/เส้นไว้ สามารถคลิกบนแปลนเพื่อวาดตามขนาดจริงได้ทันที</p>
                 </div>
             </div>
 
-            <!-- Presets Section -->
+            <!-- Presets Section with Category Filter -->
             <div class="flex-1 flex flex-col min-h-0 p-3">
-                <div class="flex justify-between items-center mb-2">
+                <div class="flex justify-between items-center mb-1.5">
                     <h2 class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-bookmark"></i> แม่แบบแท๊ก (Presets)
                     </h2>
@@ -242,11 +331,20 @@
                         <i class="fa-solid fa-plus text-[10px]"></i> เพิ่มแม่แบบ
                     </button>
                 </div>
+
+                <!-- Presets Category Filter Dropdown -->
+                <div class="mb-2 flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <span class="text-[10px] text-slate-500 pl-1"><i class="fa-solid fa-filter text-amber-500"></i> หมวด:</span>
+                    <select id="preset-category-filter" class="flex-1 text-[11px] bg-white border border-slate-300 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer">
+                        <option value="all">ทั้งหมด (ทุกหมวด)</option>
+                    </select>
+                </div>
+
                 <div id="presets-list" class="flex-1 overflow-y-auto space-y-1.5 pr-1"></div>
             </div>
         </aside>
 
-        <!-- Center Viewport Canvas -->
+        <!-- Center Viewport Canvas Workspace -->
         <main id="main-viewport" class="flex-1 bg-slate-800 relative overflow-hidden flex items-center justify-center p-0">
             <div id="empty-state" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100 text-slate-500 p-6 text-center">
                 <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl mb-4 shadow-sm">
@@ -280,30 +378,35 @@
                 <span class="text-slate-600">|</span>
                 <span>สเกล: <strong id="status-scale-text" class="text-emerald-400 font-mono">1 m = 100 px</strong></span>
                 <span class="text-slate-600">|</span>
+                <span>หมวดหมู่หน้านี้: <strong id="status-category-text" class="text-amber-300">ทั่วไป</strong></span>
+                <span class="text-slate-600">|</span>
                 <span>จำนวนมาร์กบนหน้านี้: <strong id="page-mark-count" class="text-yellow-400">0</strong> จุด</span>
             </div>
         </main>
 
-        <!-- Right Sidebar: Live BOM Summary -->
+        <!-- Right Sidebar: Live BOM Summary Table -->
         <aside class="w-96 bg-white border-l border-slate-200 flex flex-col z-20 shadow-sm no-print">
             <div class="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                 <div>
                     <h2 class="text-xs font-bold uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-list-check text-blue-600"></i> ตารางสรุปรายการ BOM
                     </h2>
-                    <p class="text-[11px] text-slate-500">สรุปจำนวนและขนาดแยกรหัสแท๊ก</p>
+                    <p class="text-[11px] text-slate-500">สรุปจำนวน ขนาด และปริมาตรแยกรหัสแท๊ก</p>
                 </div>
                 <button id="btn-clear-all" class="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded transition flex items-center gap-1 font-medium">
                     <i class="fa-solid fa-trash-can"></i> ล้างทั้งหมด
                 </button>
             </div>
 
-            <!-- View Mode Switcher (Current Page vs All Pages) -->
+            <!-- View Mode Switcher -->
             <div class="flex border-b border-slate-200 bg-slate-100/80 p-1 text-xs">
-                <button id="tab-bom-current" class="flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200">
+                <button id="tab-bom-current" class="flex-1 py-1 px-1.5 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200">
                     หน้านี้ (<span id="count-bom-current">0</span>)
                 </button>
-                <button id="tab-bom-all" class="flex-1 py-1 px-2 rounded font-medium text-center transition text-slate-600 hover:text-slate-900">
+                <button id="tab-bom-category" class="flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900">
+                    หมวดนี้ (<span id="count-bom-category">0</span>)
+                </button>
+                <button id="tab-bom-all" class="flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900">
                     รวมทุกหน้า (<span id="count-bom-all">0</span>)
                 </button>
             </div>
@@ -314,9 +417,9 @@
                     <thead>
                         <tr class="border-b border-slate-200 text-slate-500 text-[11px]">
                             <th class="py-2 font-semibold">แท๊ก</th>
-                            <th class="py-2 font-semibold">รูปทรง</th>
+                            <th class="py-2 font-semibold">รูปทรง/หมวด</th>
                             <th class="py-2 font-semibold">ขนาด (กxยxส)</th>
-                            <th class="py-2 font-semibold text-right">พื้นที่รวม (m²)</th>
+                            <th class="py-2 font-semibold text-right">พื้นที่ (m²)</th>
                             <th class="py-2 font-semibold text-right">ปริมาตร (m³)</th>
                             <th class="py-2 font-semibold text-right">จำนวน</th>
                         </tr>
@@ -339,7 +442,7 @@
         </aside>
     </div>
 
-    <!-- Modals -->
+    <!-- Custom Dialog Modal -->
     <div id="custom-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
             <div class="flex items-center gap-3">
@@ -357,6 +460,30 @@
             <div class="flex justify-end gap-2 pt-2">
                 <button id="modal-btn-cancel" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-medium transition hidden">ยกเลิก</button>
                 <button id="modal-btn-confirm" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition">ตกลง</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Manager Modal -->
+    <div id="category-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-amber-500"></i> จัดการหมวดหมู่งาน (Manage Categories)
+                </h3>
+                <button id="btn-close-category-modal" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <div class="flex gap-2">
+                    <input type="text" id="new-category-input" placeholder="พิมพ์ชื่อหมวดหมู่ใหม่ เช่น งานฐานราก, งานบันได" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                    <button id="btn-add-category" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded transition font-medium">เพิ่มหมวด</button>
+                </div>
+                <div class="border border-slate-200 rounded-lg p-2 max-h-60 overflow-y-auto space-y-1 bg-slate-50" id="category-list-container"></div>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button id="btn-save-categories-close" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium transition">ปิดหน้าต่าง</button>
             </div>
         </div>
     </div>
@@ -416,7 +543,7 @@
                                 <tr class="bg-slate-100 border-b border-slate-300 text-slate-700">
                                     <th class="p-2 border-r border-slate-300 font-bold">#</th>
                                     <th class="p-2 border-r border-slate-300 font-bold">แท๊ก</th>
-                                    <th class="p-2 border-r border-slate-300 font-bold">รูปทรง</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold">หมวดหมู่/ทรง</th>
                                     <th class="p-2 border-r border-slate-300 font-bold">ขนาด (กxยxส)</th>
                                     <th class="p-2 border-r border-slate-300 font-bold text-right">พื้นที่รวม (m²)</th>
                                     <th class="p-2 border-r border-slate-300 font-bold text-right">ปริมาตรรวม (m³)</th>
@@ -438,7 +565,7 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        const DB_NAME = 'StructuralBOMDB_V8';
+        const DB_NAME = 'StructuralBOMDB_V12';
         const DB_VERSION = 1;
         const STORE_NAME = 'projectState';
         let db = null;
@@ -447,7 +574,7 @@
         let currentRenderTask = null;
 
         let pdfDoc = null;
-        let pagesList = []; // Array of { pdfPageIndex: Number|null, dataUrl: String|null }
+        let pagesList = []; // Array of { pdfPageIndex: Number|null, dataUrl: String|null, category: String }
         let pageNum = 1;
         let totalPages = 1;
         let activeFileName = "blueprint";
@@ -461,17 +588,23 @@
         let isPanning = false;
         let panStartPos = { x: 0, y: 0 };
 
-        let bomViewScope = 'current';
+        let bomViewScope = 'current'; // 'current', 'category', 'all'
+        let activeCategoryFilter = 'all';
+        let activePresetCategoryFilter = 'all';
+        let showThumbnailsSidebar = true;
+
+        // Categories List
+        let categories = ['งานฐานราก', 'งานเสา/คาน', 'งานบันได', 'งานพื้น', 'งานสถาปัตย์', 'ทั่วไป'];
 
         // Initial Presets
         let tagPresets = [
-            { id: 'p1', name: 'F1', shape: 'count', color: '#ef4444', w: '', l: '', h: '' },
-            { id: 'p2', name: 'F2', shape: 'rectangle', color: '#22c55e', w: '1.20', l: '1.20', h: '0.60' },
-            { id: 'p3', name: 'C1', shape: 'circle', color: '#3b82f6', w: '0.30', l: '0.30', h: '3.00' },
-            { id: 'p4', name: 'W1', shape: 'line', color: '#a855f7', w: '', l: '', h: '' }
+            { id: 'p1', name: 'F1', shape: 'count', color: '#ef4444', category: 'งานฐานราก', w: '', l: '', h: '' },
+            { id: 'p2', name: 'F2', shape: 'rectangle', color: '#22c55e', category: 'งานฐานราก', w: '1.20', l: '1.20', h: '0.60' },
+            { id: 'p3', name: 'C1', shape: 'circle', color: '#3b82f6', category: 'งานเสา/คาน', w: '0.30', l: '0.30', h: '3.00' },
+            { id: 'p4', name: 'ST1', shape: 'polygon', color: '#a855f7', category: 'งานบันได', w: '', l: '', h: '' }
         ];
 
-        let activeTagConfig = { name: 'F1', shape: 'count', color: '#ef4444', w: '', l: '', h: '' };
+        let activeTagConfig = { name: 'F1', shape: 'count', color: '#ef4444', category: 'งานฐานราก', w: '', l: '', h: '', fontSize: 20 };
         let placedTags = [];
         let selectedTagId = null;
 
@@ -506,11 +639,12 @@
                 placedTags: JSON.parse(JSON.stringify(placedTags)),
                 totalPages: totalPages,
                 pagesList: JSON.parse(JSON.stringify(pagesList)),
-                pixelsPerMeter: pixelsPerMeter
+                pixelsPerMeter: pixelsPerMeter,
+                categories: JSON.parse(JSON.stringify(categories))
             };
             undoStack.push(snapshot);
             if (undoStack.length > MAX_HISTORY) undoStack.shift();
-            redoStack = []; // Clear redo stack on new user action
+            redoStack = [];
             updateUndoRedoUI();
         }
 
@@ -520,7 +654,8 @@
                 placedTags: JSON.parse(JSON.stringify(placedTags)),
                 totalPages: totalPages,
                 pagesList: JSON.parse(JSON.stringify(pagesList)),
-                pixelsPerMeter: pixelsPerMeter
+                pixelsPerMeter: pixelsPerMeter,
+                categories: JSON.parse(JSON.stringify(categories))
             };
             redoStack.push(currentSnapshot);
 
@@ -529,9 +664,11 @@
             totalPages = previousState.totalPages;
             pagesList = previousState.pagesList;
             pixelsPerMeter = previousState.pixelsPerMeter;
+            categories = previousState.categories || categories;
 
             if (pageNum > totalPages) pageNum = totalPages;
 
+            renderCategoryDropdowns();
             updateScaleUIBadges();
             updateUndoRedoUI();
             renderPage(pageNum);
@@ -547,7 +684,8 @@
                 placedTags: JSON.parse(JSON.stringify(placedTags)),
                 totalPages: totalPages,
                 pagesList: JSON.parse(JSON.stringify(pagesList)),
-                pixelsPerMeter: pixelsPerMeter
+                pixelsPerMeter: pixelsPerMeter,
+                categories: JSON.parse(JSON.stringify(categories))
             };
             undoStack.push(currentSnapshot);
 
@@ -556,9 +694,11 @@
             totalPages = nextState.totalPages;
             pagesList = nextState.pagesList;
             pixelsPerMeter = nextState.pixelsPerMeter;
+            categories = nextState.categories || categories;
 
             if (pageNum > totalPages) pageNum = totalPages;
 
+            renderCategoryDropdowns();
             updateScaleUIBadges();
             updateUndoRedoUI();
             renderPage(pageNum);
@@ -583,13 +723,13 @@
             const tag = placedTags.find(t => t.id === selectedTagId);
             if (tag) {
                 clipboardTag = JSON.parse(JSON.stringify(tag));
-                showToast(`คัดลอกมาร์ก [${tag.name}] เรียบร้อยแล้ว`, 'success');
+                showToast(`คัดลอกมาร์ก [${tag.name || tag.text || 'มาร์ก'}] เรียบร้อยแล้ว (Ctrl+C)`, 'success');
             }
         }
 
         function pasteCopiedTag() {
             if (!clipboardTag) {
-                showToast('ไม่มีมาร์กในคีย์บอร์ดคลิปบอร์ดสำหรับวาง', 'error');
+                showToast('ไม่มีมาร์กในคีย์บอร์ดคลิปบอร์ดสำหรับวาง (Ctrl+V)', 'error');
                 return;
             }
             saveHistory();
@@ -609,10 +749,11 @@
 
             placedTags.push(newTag);
             selectedTagId = newTag.id;
+            updateSelectedObjectInspector();
             redrawMarkers();
             updateBOMSummary();
             triggerAutoSave();
-            showToast(`วางมาร์ก [${newTag.name}] บนหน้านี้เรียบร้อยแล้ว`, 'success');
+            showToast(`วางมาร์ก [${newTag.name || newTag.text || 'มาร์ก'}] บนหน้านี้เรียบร้อยแล้ว`, 'success');
         }
 
         function initIndexedDB() {
@@ -636,7 +777,7 @@
                 const store = tx.objectStore(STORE_NAME);
                 store.put({
                     activeFileName, pageNum, totalPages, pixelsPerMeter, autoCalcFromScale,
-                    tagPresets, activeTagConfig, placedTags, pagesList
+                    tagPresets, activeTagConfig, placedTags, pagesList, categories
                 }, 'currentProject');
                 updateAutoSaveBadge('บันทึกแล้ว');
             } catch (err) { console.error("Auto-save error:", err); }
@@ -700,12 +841,135 @@
             });
         }
 
+        function getFilteredPagesIndices() {
+            if (activeCategoryFilter === 'all') {
+                return pagesList.map((_, idx) => idx);
+            }
+            return pagesList
+                .map((p, idx) => ({ category: p.category, idx }))
+                .filter(item => item.category === activeCategoryFilter)
+                .map(item => item.idx);
+        }
+
+        function renderCategoryDropdowns() {
+            const pageCatSelect = document.getElementById('page-category-select');
+            const tagCatSelect = document.getElementById('tag-category-input');
+            const globalFilter = document.getElementById('global-category-filter');
+            const presetFilter = document.getElementById('preset-category-filter');
+
+            if (pageCatSelect) {
+                const curVal = pagesList[pageNum - 1]?.category || 'ทั่วไป';
+                pageCatSelect.innerHTML = categories.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''} class="bg-slate-800 text-white">หมวด: ${c}</option>`).join('');
+            }
+
+            if (tagCatSelect) {
+                const curVal = activeTagConfig.category || 'ทั่วไป';
+                tagCatSelect.innerHTML = categories.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
+            }
+
+            if (globalFilter) {
+                const curVal = activeCategoryFilter;
+                globalFilter.innerHTML = `<option value="all" ${curVal === 'all' ? 'selected' : ''}>ทั้งหมด (ทุกหมวดหมู่)</option>` +
+                    categories.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
+            }
+
+            if (presetFilter) {
+                const curVal = activePresetCategoryFilter;
+                presetFilter.innerHTML = `<option value="all" ${curVal === 'all' ? 'selected' : ''}>ทั้งหมด (ทุกหมวด)</option>` +
+                    categories.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
+            }
+
+            renderCategoryManagerList();
+        }
+
+        function renderCategoryManagerList() {
+            const container = document.getElementById('category-list-container');
+            if (!container) return;
+            container.innerHTML = '';
+            categories.forEach(cat => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-2 rounded bg-white border border-slate-200 text-xs';
+                div.innerHTML = `
+                    <span class="font-semibold text-slate-700 flex items-center gap-1.5"><i class="fa-solid fa-folder text-amber-500"></i> ${cat}</span>
+                    <button class="btn-del-cat text-slate-300 hover:text-rose-600 transition p-1" data-cat="${cat}"><i class="fa-solid fa-trash-can"></i></button>
+                `;
+                div.querySelector('.btn-del-cat').addEventListener('click', () => deleteCategory(cat));
+                container.appendChild(div);
+            });
+        }
+
+        async function addCategory() {
+            const input = document.getElementById('new-category-input');
+            const val = input ? input.value.trim() : '';
+            if (!val) return;
+            if (categories.includes(val)) {
+                showToast('มีหมวดหมู่นี้ในระบบแล้ว', 'error'); return;
+            }
+            saveHistory();
+            categories.push(val);
+            if (input) input.value = '';
+            renderCategoryDropdowns();
+            renderPresets();
+            triggerAutoSave();
+            showToast(`เพิ่มหมวดหมู่ "${val}" เรียบร้อยแล้ว`, 'success');
+        }
+
+        async function quickAddCategory() {
+            const catName = await showModal({
+                title: 'เพิ่มหมวดหมู่งานใหม่',
+                message: 'กรอกชื่อหมวดหมู่งานใหม่ เช่น งานรั้ว, งานหลังคา:',
+                showInput: true,
+                inputValue: '',
+                showCancel: true
+            });
+            if (catName && catName.trim() !== '') {
+                const val = catName.trim();
+                if (categories.includes(val)) {
+                    showToast('มีหมวดหมู่นี้ในระบบแล้ว', 'error'); return;
+                }
+                saveHistory();
+                categories.push(val);
+                activeTagConfig.category = val;
+                renderCategoryDropdowns();
+                renderPresets();
+                triggerAutoSave();
+                showToast(`เพิ่มและเลือกหมวดหมู่ "${val}" เรียบร้อยแล้ว`, 'success');
+            }
+        }
+
+        async function deleteCategory(catName) {
+            if (categories.length <= 1) {
+                showToast('ต้องมีอย่างน้อย 1 หมวดหมู่ในระบบ', 'error'); return;
+            }
+            if (await showModal({ title: 'ยืนยันการลบหมวดหมู่', message: `ต้องการลบหมวดหมู่ "${catName}" หรือไม่? (รายการที่ใช้หมวดนี้จะเปลี่ยนเป็นหมวดแรก)`, showCancel: true })) {
+                saveHistory();
+                categories = categories.filter(c => c !== catName);
+                const fallbackCat = categories[0] || 'ทั่วไป';
+
+                pagesList.forEach(p => { if (p.category === catName) p.category = fallbackCat; });
+                placedTags.forEach(t => { if (t.category === catName) t.category = fallbackCat; });
+                tagPresets.forEach(p => { if (p.category === catName) p.category = fallbackCat; });
+                if (activeTagConfig.category === catName) activeTagConfig.category = fallbackCat;
+                if (activeCategoryFilter === catName) activeCategoryFilter = 'all';
+                if (activePresetCategoryFilter === catName) activePresetCategoryFilter = 'all';
+
+                renderCategoryDropdowns();
+                renderPresets();
+                redrawMarkers();
+                updateBOMSummary();
+                triggerAutoSave();
+                showToast(`ลบหมวดหมู่ "${catName}" เรียบร้อยแล้ว`, 'success');
+            }
+        }
+
         function updateScaleUIBadges() {
             const scaleBadge = document.getElementById('scale-info-badge');
             const statusScaleText = document.getElementById('status-scale-text');
+            const statusCategoryText = document.getElementById('status-category-text');
             const pxText = `${pixelsPerMeter.toFixed(1)} px`;
             if (scaleBadge) scaleBadge.textContent = `1m = ${pxText}`;
             if (statusScaleText) statusScaleText.textContent = `1 m = ${pxText}`;
+            if (statusCategoryText) statusCategoryText.textContent = pagesList[pageNum - 1]?.category || 'ทั่วไป';
         }
 
         function getCanvasCoords(e) {
@@ -739,6 +1003,56 @@
             updateTransform();
         }
 
+        function renderThumbnailsSidebar() {
+            const thumbsContainer = document.getElementById('thumbs-container');
+            const countBadge = document.getElementById('thumbs-count-badge');
+            if (!thumbsContainer) return;
+
+            const filteredIndices = getFilteredPagesIndices();
+            if (countBadge) countBadge.textContent = `${filteredIndices.length} หน้า`;
+
+            thumbsContainer.innerHTML = '';
+            if (filteredIndices.length === 0) {
+                thumbsContainer.innerHTML = `
+                    <div class="text-center text-slate-500 text-xs py-8">
+                        <i class="fa-solid fa-file-pdf text-2xl mb-2 text-slate-700 block"></i>
+                        ไม่พบหน้าในหมวดนี้
+                    </div>
+                `;
+                return;
+            }
+
+            filteredIndices.forEach((realIdx) => {
+                const pNum = realIdx + 1;
+                const pageItem = pagesList[realIdx];
+                const pageCat = pageItem?.category || 'ทั่วไป';
+                const markCount = placedTags.filter(t => t.page === pNum).length;
+
+                const card = document.createElement('div');
+                card.className = `thumb-card p-1.5 rounded-lg border text-xs cursor-pointer transition flex flex-col items-center bg-slate-800 ${pNum === pageNum ? 'active border-blue-500 ring-2 ring-blue-500/50 bg-slate-800' : 'border-slate-700 hover:border-slate-500'}`;
+
+                let imgData = pageItem?.dataUrl || 'https://placehold.co/120x160/1e293b/94a3b8?text=PDF+Page+' + pNum;
+
+                card.innerHTML = `
+                    <div class="w-full h-28 bg-slate-950 rounded overflow-hidden flex items-center justify-center border border-slate-800 relative mb-1.5">
+                        <img src="${imgData}" class="max-w-full max-h-full object-contain" alt="Page ${pNum}">
+                        <span class="absolute top-1 left-1 bg-slate-900/80 text-amber-300 text-[9px] px-1 rounded border border-slate-700 font-mono">p.${pNum}</span>
+                        ${markCount > 0 ? `<span class="absolute bottom-1 right-1 bg-yellow-500 text-slate-950 font-bold text-[9px] px-1 rounded-full">${markCount}</span>` : ''}
+                    </div>
+                    <div class="w-full flex justify-between items-center text-[10px] text-slate-300 px-0.5">
+                        <span class="font-bold text-slate-200">หน้า ${pNum}</span>
+                        <span class="text-amber-400 bg-slate-900 px-1 rounded truncate max-w-[70px]">${pageCat}</span>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    renderPage(pNum);
+                });
+
+                thumbsContainer.appendChild(card);
+            });
+        }
+
         function computeShapeMetrics(shape) {
             const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : 100;
             let realW = shape.w !== undefined && shape.w !== '' ? parseFloat(shape.w) : null;
@@ -748,7 +1062,7 @@
             let perimeter = 0;
             let volume = 0;
 
-            if (shape.shape === 'count') {
+            if (shape.shape === 'count' || shape.shape === 'text') {
                 if (realW !== null && realL !== null && !isNaN(realW) && !isNaN(realL)) {
                     area = realW * realL;
                 } else {
@@ -794,7 +1108,6 @@
                 }
             }
 
-            // Calculate Volume (m³) if height/depth (h) is present
             if (realH !== null && !isNaN(realH) && realH > 0) {
                 if (shape.shape === 'line') {
                     if (realW !== null && !isNaN(realW) && realW > 0) {
@@ -841,7 +1154,6 @@
             if (num < 1 || num > totalPages) return;
             pageNum = num;
 
-            // Safely cancel and await previous render task cleanup before starting a new render
             if (currentRenderTask) {
                 const taskToCancel = currentRenderTask;
                 currentRenderTask = null;
@@ -868,6 +1180,7 @@
                         fitToScreen();
                         redrawMarkers();
                         updateBOMSummary();
+                        renderThumbnailsSidebar();
                     }
                 };
                 img.src = pageItem.dataUrl;
@@ -892,6 +1205,7 @@
                         fitToScreen();
                         redrawMarkers();
                         updateBOMSummary();
+                        renderThumbnailsSidebar();
                     }
                 } catch (err) {
                     if (err && (err.name === 'RenderingCancelledException' || err.message?.includes('cancelled'))) {
@@ -905,9 +1219,16 @@
             const totPageEl = document.getElementById('total-pages');
             const pageCtrlEl = document.getElementById('page-controls');
 
-            if (curPageEl) curPageEl.textContent = pageNum;
-            if (totPageEl) totPageEl.textContent = totalPages;
+            const filteredIndices = getFilteredPagesIndices();
+            const filteredPos = filteredIndices.indexOf(pageNum - 1);
+
+            if (curPageEl) curPageEl.textContent = filteredPos !== -1 ? filteredPos + 1 : pageNum;
+            if (totPageEl) totPageEl.textContent = filteredIndices.length;
             if (pageCtrlEl) pageCtrlEl.classList.remove('hidden');
+
+            renderCategoryDropdowns();
+            updateScaleUIBadges();
+            updateSelectedObjectInspector();
         }
 
         async function loadBlueprintFile(file) {
@@ -926,7 +1247,7 @@
                     
                     pagesList = [];
                     for (let i = 1; i <= totalPages; i++) {
-                        pagesList.push({ pdfPageIndex: i, dataUrl: null });
+                        pagesList.push({ pdfPageIndex: i, dataUrl: null, category: 'ทั่วไป' });
                     }
 
                     await renderPage(1);
@@ -939,7 +1260,7 @@
                 reader.onload = function (e) {
                     pdfDoc = null;
                     totalPages = 1;
-                    pagesList = [{ pdfPageIndex: null, dataUrl: e.target.result }];
+                    pagesList = [{ pdfPageIndex: null, dataUrl: e.target.result, category: 'ทั่วไป' }];
                     renderPage(1);
                     if (emptyState) emptyState.classList.add('hidden');
                     triggerAutoSave();
@@ -962,6 +1283,7 @@
             saveHistory();
 
             const currentCanvasData = pdfCanvas.toDataURL('image/png');
+            const curCat = pagesList[pageNum - 1]?.category || 'ทั่วไป';
 
             if (pagesList[pageNum - 1]) {
                 pagesList[pageNum - 1].dataUrl = currentCanvasData;
@@ -969,7 +1291,8 @@
 
             const newPageItem = {
                 pdfPageIndex: null,
-                dataUrl: currentCanvasData
+                dataUrl: currentCanvasData,
+                category: curCat
             };
 
             pagesList.splice(pageNum, 0, newPageItem);
@@ -1026,7 +1349,12 @@
                 const tag = placedTags[i];
                 if (tag.page !== pageNum) continue;
 
-                if (tag.shape === 'circle' || tag.shape === 'count') {
+                if (tag.shape === 'text' && tag.text) {
+                    markerCtx.font = `${tag.fontSize || 20}px Prompt, sans-serif`;
+                    const textWidth = markerCtx.measureText(tag.text).width;
+                    const textHeight = tag.fontSize || 20;
+                    if (cx >= tag.x - 5 && cx <= tag.x + textWidth + 5 && cy >= tag.y - textHeight && cy <= tag.y + 5) return tag;
+                } else if (tag.shape === 'circle' || tag.shape === 'count') {
                     if (Math.hypot(cx - tag.x, cy - tag.y) <= (tag.radius || 18)) return tag;
                 } else if (tag.shape === 'rectangle') {
                     const minX = Math.min(tag.x, tag.x2), maxX = Math.max(tag.x, tag.x2);
@@ -1073,11 +1401,7 @@
                 ctx.strokeStyle = '#f59e0b';
                 ctx.lineWidth = 3;
                 ctx.setLineDash([6, 3]);
-                ctx.beginPath();
-                ctx.moveTo(tag.x, tag.y);
-                ctx.lineTo(tag.x2, tag.y2);
-                ctx.stroke();
-
+                ctx.beginPath(); ctx.moveTo(tag.x, tag.y); ctx.lineTo(tag.x2, tag.y2); ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.fillStyle = '#f59e0b';
                 ctx.beginPath(); ctx.arc(tag.x, tag.y, 5, 0, 2 * Math.PI); ctx.fill();
@@ -1095,6 +1419,26 @@
                 ctx.fill();
                 ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(labelText, midX, midY - 10);
+                ctx.restore();
+                return;
+            }
+
+            // Rendering Text Tool Marker
+            if (tag.shape === 'text') {
+                const fontSize = tag.fontSize || 20;
+                ctx.font = `bold ${fontSize}px Prompt, sans-serif`;
+                ctx.fillStyle = tag.color || '#9333ea';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillText(tag.text || '', tag.x, tag.y);
+
+                if (isSelected) {
+                    const textWidth = ctx.measureText(tag.text || '').width;
+                    ctx.strokeStyle = '#3b82f6';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 2]);
+                    ctx.strokeRect(tag.x - 4, tag.y - fontSize, textWidth + 8, fontSize + 6);
+                }
                 ctx.restore();
                 return;
             }
@@ -1157,9 +1501,7 @@
 
                 if (isTemp && tag.points.length >= 1) {
                     ctx.fillStyle = '#f59e0b';
-                    ctx.beginPath();
-                    ctx.arc(tag.points[0].x, tag.points[0].y, 6, 0, 2 * Math.PI);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(tag.points[0].x, tag.points[0].y, 6, 0, 2 * Math.PI); ctx.fill();
                 }
 
                 if (tag.points.length > 0) {
@@ -1187,7 +1529,9 @@
             }
             if (e.button !== 0) return;
             const pos = getCanvasCoords(e);
+            const curCat = pagesList[pageNum - 1]?.category || activeTagConfig.category || 'ทั่วไป';
 
+            // Scale Calibration Tool
             if (activeTool === 'scale') {
                 isDrawing = true;
                 drawStartPos = pos;
@@ -1195,7 +1539,44 @@
                 return;
             }
 
-            // Single-click Count Tool: Instant tag placement +1
+            // Text Tool Placement
+            if (activeTool === 'text') {
+                showModal({
+                    title: 'เพิ่มข้อความบนแบบแปลน',
+                    message: 'กรอกข้อความที่ต้องการวางบนแบบแปลน (ภาษาไทย / English):',
+                    showInput: true,
+                    inputValue: '',
+                    showCancel: true
+                }).then(textVal => {
+                    if (textVal && textVal.trim() !== '') {
+                        saveHistory();
+                        const fontSz = parseInt(document.getElementById('text-size-input')?.value || 20, 10);
+                        const newTextTag = {
+                            id: 'tag_' + Date.now(),
+                            page: pageNum,
+                            name: activeTagConfig.name,
+                            text: textVal.trim(),
+                            shape: 'text',
+                            color: activeTagConfig.color || '#9333ea',
+                            category: curCat,
+                            fontSize: fontSz,
+                            x: pos.x,
+                            y: pos.y,
+                            x2: pos.x,
+                            y2: pos.y
+                        };
+                        placedTags.push(newTextTag);
+                        selectedTagId = newTextTag.id;
+                        updateSelectedObjectInspector();
+                        redrawMarkers();
+                        updateBOMSummary();
+                        triggerAutoSave();
+                    }
+                });
+                return;
+            }
+
+            // Count Tool (Instant single-click placement)
             if (activeTool === 'count') {
                 saveHistory();
                 const newTag = {
@@ -1204,6 +1585,7 @@
                     name: activeTagConfig.name,
                     shape: 'count',
                     color: activeTagConfig.color,
+                    category: curCat,
                     w: activeTagConfig.w,
                     l: activeTagConfig.l,
                     h: activeTagConfig.h,
@@ -1216,10 +1598,79 @@
                 };
                 placedTags.push(newTag);
                 selectedTagId = newTag.id;
+                updateSelectedObjectInspector();
                 redrawMarkers();
                 updateBOMSummary();
                 renderPresets();
                 triggerAutoSave();
+                return;
+            }
+
+            // Exact Dimension Drawing on Click (If dimensions are specified)
+            const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : 100;
+            const reqW = parseFloat(activeTagConfig.w);
+            const reqL = parseFloat(activeTagConfig.l);
+
+            if (activeTool === 'rectangle' && !isNaN(reqW) && reqW > 0 && !isNaN(reqL) && reqL > 0) {
+                saveHistory();
+                const pxW = reqW * ppm;
+                const pxL = reqL * ppm;
+                const newTag = {
+                    id: 'tag_' + Date.now(),
+                    page: pageNum,
+                    name: activeTagConfig.name,
+                    shape: 'rectangle',
+                    color: activeTagConfig.color,
+                    category: curCat,
+                    w: activeTagConfig.w,
+                    l: activeTagConfig.l,
+                    h: activeTagConfig.h,
+                    x: pos.x,
+                    y: pos.y,
+                    x2: pos.x + pxW,
+                    y2: pos.y + pxL,
+                    isAutoScaled: false
+                };
+                placedTags.push(newTag);
+                selectedTagId = newTag.id;
+                updateSelectedObjectInspector();
+                redrawMarkers();
+                updateBOMSummary();
+                renderPresets();
+                triggerAutoSave();
+                showToast(`วางสี่เหลี่ยมขนาด ${reqW}x${reqL}m สำเร็จ`, 'success');
+                return;
+            }
+
+            if (activeTool === 'circle' && (!isNaN(reqW) && reqW > 0 || !isNaN(reqL) && reqL > 0)) {
+                saveHistory();
+                const dia = !isNaN(reqW) && reqW > 0 ? reqW : reqL;
+                const radiusPx = (dia * ppm) / 2;
+                const newTag = {
+                    id: 'tag_' + Date.now(),
+                    page: pageNum,
+                    name: activeTagConfig.name,
+                    shape: 'circle',
+                    color: activeTagConfig.color,
+                    category: curCat,
+                    w: activeTagConfig.w,
+                    l: activeTagConfig.l,
+                    h: activeTagConfig.h,
+                    x: pos.x,
+                    y: pos.y,
+                    x2: pos.x,
+                    y2: pos.y,
+                    radius: radiusPx,
+                    isAutoScaled: false
+                };
+                placedTags.push(newTag);
+                selectedTagId = newTag.id;
+                updateSelectedObjectInspector();
+                redrawMarkers();
+                updateBOMSummary();
+                renderPresets();
+                triggerAutoSave();
+                showToast(`วางวงกลมเส้นผ่านศูนย์กลาง ${dia}m สำเร็จ`, 'success');
                 return;
             }
 
@@ -1230,6 +1681,7 @@
                     isDraggingTag = true;
                     dragOffset = { x: pos.x - hitTag.x, y: pos.y - hitTag.y };
                 } else selectedTagId = null;
+                updateSelectedObjectInspector();
                 redrawMarkers(); updateBOMSummary();
             } else if (activeTool === 'polygon') {
                 if (polygonPoints.length >= 3) {
@@ -1240,16 +1692,25 @@
                     }
                 }
                 polygonPoints.push(pos);
-                tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'polygon', color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, points: polygonPoints };
+                tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'polygon', color: activeTagConfig.color, category: curCat, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, points: polygonPoints };
                 redrawMarkers();
             } else if (activeTool === 'line') {
                 if (!isDrawing) {
                     isDrawing = true; drawStartPos = pos;
-                    tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'line', color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, x: pos.x, y: pos.y, x2: pos.x, y2: pos.y, isAutoScaled: autoCalcFromScale };
+                    const reqLVal = parseFloat(activeTagConfig.l);
+                    let initX2 = pos.x;
+                    let initY2 = pos.y;
+                    if (!isNaN(reqLVal) && reqLVal > 0) {
+                        initX2 = pos.x + (reqLVal * ppm);
+                    }
+                    tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: 'line', color: activeTagConfig.color, category: curCat, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, x: pos.x, y: pos.y, x2: initX2, y2: initY2, isAutoScaled: autoCalcFromScale };
+                    if (!isNaN(reqLVal) && reqLVal > 0) {
+                        showToast(`ล็อกความยาว ${reqLVal}m แล้ว หมุนเมาส์เลือกทิศทาง/มุมทะแยง แล้วคลิกวาง`, 'info');
+                    }
                 } else finalizeDrawing();
             } else {
                 isDrawing = true; drawStartPos = pos;
-                tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: activeTool, color: activeTagConfig.color, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, x: pos.x, y: pos.y, x2: pos.x, y2: pos.y, radius: 20, isAutoScaled: autoCalcFromScale };
+                tempShape = { id: 'tag_' + Date.now(), page: pageNum, name: activeTagConfig.name, shape: activeTool, color: activeTagConfig.color, category: curCat, w: activeTagConfig.w, l: activeTagConfig.l, h: activeTagConfig.h, x: pos.x, y: pos.y, x2: pos.x, y2: pos.y, radius: 20, isAutoScaled: autoCalcFromScale };
             }
         }
 
@@ -1270,8 +1731,31 @@
                     redrawMarkers();
                 }
             } else if (isDrawing && tempShape) {
-                tempShape.x2 = pos.x; tempShape.y2 = pos.y;
-                if (tempShape.shape === 'circle') tempShape.radius = Math.max(10, Math.hypot(pos.x - tempShape.x, pos.y - tempShape.y));
+                if (tempShape.shape === 'line') {
+                    const reqL = parseFloat(activeTagConfig.l);
+                    const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : 100;
+                    let angle = Math.atan2(pos.y - tempShape.y, pos.x - tempShape.x);
+                    
+                    // Snap angle to nearest 45 degrees if Shift is held
+                    if (e.shiftKey) {
+                        const snapAngle = Math.PI / 4;
+                        angle = Math.round(angle / snapAngle) * snapAngle;
+                    }
+
+                    if (!isNaN(reqL) && reqL > 0) {
+                        const pxL = reqL * ppm;
+                        tempShape.x2 = tempShape.x + pxL * Math.cos(angle);
+                        tempShape.y2 = tempShape.y + pxL * Math.sin(angle);
+                    } else {
+                        tempShape.x2 = pos.x;
+                        tempShape.y2 = pos.y;
+                    }
+                } else if (tempShape.shape === 'circle') {
+                    tempShape.radius = Math.max(10, Math.hypot(pos.x - tempShape.x, pos.y - tempShape.y));
+                } else {
+                    tempShape.x2 = pos.x;
+                    tempShape.y2 = pos.y;
+                }
                 redrawMarkers();
             }
         }
@@ -1310,7 +1794,7 @@
                 return;
             }
 
-            if (activeTool === 'line' || activeTool === 'polygon' || activeTool === 'count') return;
+            if (activeTool === 'line' || activeTool === 'polygon' || activeTool === 'count' || activeTool === 'text') return;
             if (isDrawing && tempShape) finalizeDrawing();
         }
 
@@ -1318,12 +1802,13 @@
             if (!tempShape) return;
             saveHistory();
             isDrawing = false;
-            if (autoCalcFromScale && tempShape.shape !== 'polygon' && tempShape.shape !== 'count') {
+            if (autoCalcFromScale && tempShape.shape !== 'polygon' && tempShape.shape !== 'count' && tempShape.shape !== 'text') {
                 const metrics = computeShapeMetrics(tempShape);
                 tempShape.w = metrics.w; tempShape.l = metrics.l;
             }
             placedTags.push({ ...tempShape });
             selectedTagId = tempShape.id;
+            updateSelectedObjectInspector();
             tempShape = null; polygonPoints = [];
             redrawMarkers(); updateBOMSummary(); renderPresets(); triggerAutoSave();
         }
@@ -1333,18 +1818,31 @@
             const emptyMsg = document.getElementById('bom-empty-msg');
             const itemsList = document.getElementById('placed-tags-list');
             const countCurrentEl = document.getElementById('count-bom-current');
+            const countCategoryEl = document.getElementById('count-bom-category');
             const countAllEl = document.getElementById('count-bom-all');
             const totalItemsCount = document.getElementById('total-items-count');
 
             if (!tableBody || !itemsList) return;
             tableBody.innerHTML = ''; itemsList.innerHTML = '';
 
+            const currentCategory = pagesList[pageNum - 1]?.category || 'ทั่วไป';
             const currentTags = placedTags.filter(t => t.page === pageNum);
+            const categoryTags = placedTags.filter(t => t.category === currentCategory || pagesList[t.page - 1]?.category === currentCategory);
+
             if (countCurrentEl) countCurrentEl.textContent = currentTags.length;
+            if (countCategoryEl) countCategoryEl.textContent = categoryTags.length;
             if (countAllEl) countAllEl.textContent = placedTags.length;
             if (totalItemsCount) totalItemsCount.textContent = placedTags.length;
 
-            const tagsToDisplay = bomViewScope === 'current' ? currentTags : placedTags;
+            let tagsToDisplay = [];
+            if (bomViewScope === 'current') tagsToDisplay = currentTags;
+            else if (bomViewScope === 'category') tagsToDisplay = categoryTags;
+            else tagsToDisplay = placedTags;
+
+            // Apply Global Category Filter
+            if (activeCategoryFilter !== 'all') {
+                tagsToDisplay = tagsToDisplay.filter(t => t.category === activeCategoryFilter || pagesList[t.page - 1]?.category === activeCategoryFilter);
+            }
 
             if (tagsToDisplay.length === 0) {
                 if (emptyMsg) emptyMsg.classList.remove('hidden'); return;
@@ -1353,11 +1851,13 @@
 
             const summaryMap = {};
             tagsToDisplay.forEach(tag => {
+                if (tag.shape === 'text') return; // Exclude text annotations from BOM counts
                 const metrics = computeShapeMetrics(tag);
-                const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
+                const tagCat = tag.category || pagesList[tag.page - 1]?.category || 'ทั่วไป';
+                const key = `${tag.name}_${tag.shape}_${tagCat}_${metrics.w}_${metrics.l}_${metrics.h}`;
                 if (!summaryMap[key]) {
                     summaryMap[key] = {
-                        name: tag.name, shape: tag.shape, color: tag.color,
+                        name: tag.name, shape: tag.shape, color: tag.color, category: tagCat,
                         w: metrics.w, l: metrics.l, h: metrics.h,
                         totalArea: 0, totalVolume: 0, count: 0
                     };
@@ -1379,7 +1879,6 @@
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
                 const shapeIcon = item.shape === 'count' ? 'fa-hashtag' : item.shape === 'circle' ? 'fa-circle' : item.shape === 'rectangle' ? 'fa-square' : item.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
-                const shapeText = item.shape === 'count' ? 'จุดนับ' : item.shape === 'circle' ? 'วงกลม' : item.shape === 'rectangle' ? 'สี่เหลี่ยม' : item.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง';
                 const dimStr = formatDimensionDisplay(item.w, item.l, item.h);
 
                 tr.innerHTML = `
@@ -1387,7 +1886,12 @@
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${item.color}"></span>
                         <span>${item.name}</span>
                     </td>
-                    <td class="py-2.5 text-slate-600"><i class="fa-solid ${shapeIcon} text-[10px] mr-1"></i>${shapeText}</td>
+                    <td class="py-2.5 text-slate-600">
+                        <div class="flex flex-col">
+                            <span><i class="fa-solid ${shapeIcon} text-[10px] mr-1"></i>${item.shape}</span>
+                            <span class="text-[9px] text-amber-700 bg-amber-50 px-1 rounded w-fit">${item.category}</span>
+                        </div>
+                    </td>
                     <td class="py-2.5 font-mono text-[11px] text-slate-600">${dimStr}</td>
                     <td class="py-2.5 font-mono text-right font-bold text-slate-800">${item.totalArea > 0 ? `${item.totalArea.toFixed(2)} m²` : '-'}</td>
                     <td class="py-2.5 font-mono text-right font-bold text-emerald-700">${item.totalVolume > 0 ? `${item.totalVolume.toFixed(2)} m³` : '-'}</td>
@@ -1409,16 +1913,20 @@
 
             tagsToDisplay.forEach((tag, idx) => {
                 const metrics = computeShapeMetrics(tag);
+                const tagCat = tag.category || pagesList[tag.page - 1]?.category || 'ทั่วไป';
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `flex items-center justify-between p-1.5 rounded text-xs border ${tag.id === selectedTagId ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-200'} cursor-pointer`;
-                const infoParts = [`หน้า ${tag.page}`];
-                if (metrics.area > 0) infoParts.push(`${metrics.area.toFixed(2)} m²`);
-                if (metrics.volume > 0) infoParts.push(`${metrics.volume.toFixed(2)} m³`);
+                const infoParts = [`หน้า ${tag.page}`, tagCat];
+                if (tag.shape === 'text') infoParts.push(`ข้อความ: "${tag.text}" (${tag.fontSize || 20}px)`);
+                else {
+                    if (metrics.area > 0) infoParts.push(`${metrics.area.toFixed(2)} m²`);
+                    if (metrics.volume > 0) infoParts.push(`${metrics.volume.toFixed(2)} m³`);
+                }
 
                 itemDiv.innerHTML = `
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
-                        <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.name}</span>
+                        <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.shape === 'text' ? 'ข้อความ' : tag.name}</span>
                         <span class="text-[10px] text-slate-500 truncate">(${infoParts.join(' - ')})</span>
                     </div>
                     <button class="btn-del-tag text-red-500 hover:text-red-700 px-1" data-id="${tag.id}"><i class="fa-solid fa-xmark"></i></button>
@@ -1426,6 +1934,7 @@
                 itemDiv.addEventListener('click', (e) => {
                     if (e.target.closest('.btn-del-tag')) return;
                     selectedTagId = tag.id;
+                    updateSelectedObjectInspector();
                     if (tag.page !== pageNum) renderPage(tag.page);
                     else redrawMarkers();
                 });
@@ -1434,6 +1943,7 @@
                     saveHistory();
                     placedTags = placedTags.filter(t => t.id !== tag.id);
                     if (selectedTagId === tag.id) selectedTagId = null;
+                    updateSelectedObjectInspector();
                     redrawMarkers(); updateBOMSummary(); triggerAutoSave();
                 });
                 itemsList.appendChild(itemDiv);
@@ -1444,7 +1954,18 @@
             const listContainer = document.getElementById('presets-list');
             if (!listContainer) return;
             listContainer.innerHTML = '';
-            tagPresets.forEach(preset => {
+
+            let filteredPresets = tagPresets;
+            if (activePresetCategoryFilter !== 'all') {
+                filteredPresets = tagPresets.filter(p => p.category === activePresetCategoryFilter);
+            }
+
+            if (filteredPresets.length === 0) {
+                listContainer.innerHTML = `<div class="text-center text-slate-400 text-xs py-4">ไม่พบแม่แบบในหมวดนี้</div>`;
+                return;
+            }
+
+            filteredPresets.forEach(preset => {
                 const btn = document.createElement('div');
                 btn.className = `p-2 rounded-lg border flex items-center justify-between cursor-pointer transition ${activeTagConfig.name === preset.name ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`;
                 const shapeIcon = preset.shape === 'count' ? 'fa-hashtag' : preset.shape === 'circle' ? 'fa-circle' : preset.shape === 'rectangle' ? 'fa-square' : preset.shape === 'polygon' ? 'fa-draw-polygon' : 'fa-slash';
@@ -1457,6 +1978,7 @@
                             <div class="font-bold text-xs text-slate-800 flex items-center gap-1">
                                 <span>${preset.name}</span>
                                 <i class="fa-solid ${shapeIcon} text-[10px] text-slate-400"></i>
+                                <span class="text-[9px] bg-slate-100 text-slate-600 px-1 rounded font-normal">${preset.category || 'ทั่วไป'}</span>
                             </div>
                             ${dimText ? `<div class="text-[10px] text-slate-500 font-mono">${dimText}</div>` : ''}
                         </div>
@@ -1481,6 +2003,7 @@
             const tagInput = document.getElementById('tag-name-input');
             const colInput = document.getElementById('tag-color-input');
             const hexInput = document.getElementById('tag-color-hex');
+            const catInput = document.getElementById('tag-category-input');
             const wInput = document.getElementById('dim-w-input');
             const lInput = document.getElementById('dim-l-input');
             const hInput = document.getElementById('dim-h-input');
@@ -1489,24 +2012,89 @@
             if (tagInput) tagInput.value = activeTagConfig.name || '';
             if (colInput) colInput.value = activeTagConfig.color || '#ef4444';
             if (hexInput) hexInput.value = activeTagConfig.color || '#ef4444';
+            if (catInput) catInput.value = activeTagConfig.category || 'ทั่วไป';
             if (wInput) wInput.value = activeTagConfig.w !== undefined ? activeTagConfig.w : '';
             if (lInput) lInput.value = activeTagConfig.l !== undefined ? activeTagConfig.l : '';
             if (hInput) hInput.value = activeTagConfig.h !== undefined ? activeTagConfig.h : '';
             if (prevEl) prevEl.style.backgroundColor = activeTagConfig.color || '#ef4444';
+
+            const sizeDisplay = document.getElementById('text-size-display');
+            const sizeInput = document.getElementById('text-size-input');
+            if (sizeDisplay) sizeDisplay.textContent = `${activeTagConfig.fontSize || 20}px`;
+            if (sizeInput) sizeInput.value = activeTagConfig.fontSize || 20;
+        }
+
+        function updateSelectedObjectInspector() {
+            if (!selectedTagId) return;
+            const tag = placedTags.find(t => t.id === selectedTagId);
+            if (!tag) return;
+
+            // Sync Selected Tag properties to Inspector Controls
+            if (tag.shape === 'text') {
+                const sizeDisplay = document.getElementById('text-size-display');
+                const sizeInput = document.getElementById('text-size-input');
+                const colInput = document.getElementById('tag-color-input');
+                const hexInput = document.getElementById('tag-color-hex');
+                if (sizeDisplay) sizeDisplay.textContent = `${tag.fontSize || 20}px`;
+                if (sizeInput) sizeInput.value = tag.fontSize || 20;
+                if (colInput) colInput.value = tag.color || '#9333ea';
+                if (hexInput) hexInput.value = tag.color || '#9333ea';
+            }
+        }
+
+        function updateSelectedTextFontSize(newSize) {
+            newSize = Math.max(8, Math.min(120, newSize));
+            activeTagConfig.fontSize = newSize;
+
+            if (selectedTagId) {
+                const tag = placedTags.find(t => t.id === selectedTagId);
+                if (tag && tag.shape === 'text') {
+                    saveHistory();
+                    tag.fontSize = newSize;
+                    redrawMarkers();
+                    updateBOMSummary();
+                    triggerAutoSave();
+                }
+            }
+
+            const sizeDisplay = document.getElementById('text-size-display');
+            const sizeInput = document.getElementById('text-size-input');
+            if (sizeDisplay) sizeDisplay.textContent = `${newSize}px`;
+            if (sizeInput) sizeInput.value = newSize;
         }
 
         function syncActiveTagFromInputs() {
             const tagInput = document.getElementById('tag-name-input');
             const colInput = document.getElementById('tag-color-input');
+            const catInput = document.getElementById('tag-category-input');
             const wInput = document.getElementById('dim-w-input');
             const lInput = document.getElementById('dim-l-input');
             const hInput = document.getElementById('dim-h-input');
 
             if (tagInput) activeTagConfig.name = tagInput.value.trim() || 'F1';
             if (colInput) activeTagConfig.color = colInput.value || '#ef4444';
+            if (catInput) activeTagConfig.category = catInput.value || 'ทั่วไป';
             if (wInput) activeTagConfig.w = wInput.value.trim();
             if (lInput) activeTagConfig.l = lInput.value.trim();
             if (hInput) activeTagConfig.h = hInput.value.trim();
+
+            if (selectedTagId) {
+                const tag = placedTags.find(t => t.id === selectedTagId);
+                if (tag) {
+                    saveHistory();
+                    tag.color = activeTagConfig.color;
+                    tag.category = activeTagConfig.category;
+                    if (tag.shape !== 'text') {
+                        tag.name = activeTagConfig.name;
+                        tag.w = activeTagConfig.w;
+                        tag.l = activeTagConfig.l;
+                        tag.h = activeTagConfig.h;
+                    }
+                    redrawMarkers();
+                    updateBOMSummary();
+                    triggerAutoSave();
+                }
+            }
 
             const prevEl = document.getElementById('active-tag-preview');
             if (prevEl) prevEl.style.backgroundColor = activeTagConfig.color;
@@ -1514,7 +2102,7 @@
 
         function setTool(toolName) {
             activeTool = toolName;
-            if (['count', 'circle', 'rectangle', 'line', 'polygon'].includes(toolName)) {
+            if (['count', 'circle', 'rectangle', 'line', 'polygon', 'text'].includes(toolName)) {
                 activeTagConfig.shape = toolName;
             }
             document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -1526,8 +2114,16 @@
                     btn.classList.add('bg-white', 'border-slate-200', 'text-slate-700');
                 }
             });
+
+            const textOptions = document.getElementById('text-tool-options');
+            if (textOptions) {
+                if (toolName === 'text' || (selectedTagId && placedTags.find(t => t.id === selectedTagId)?.shape === 'text')) {
+                    textOptions.classList.remove('hidden');
+                } else textOptions.classList.add('hidden');
+            }
+
             const statusEl = document.getElementById('tool-status');
-            const toolDisplayNames = { select: 'เลือก/ย้ายวัตถุ', pan: 'เลื่อนมุมมอง', scale: 'ตั้งสเกลแปลน', count: 'นับจำนวน (คลิกเพื่อปักจุด +1)', circle: 'วาดวงกลม', rectangle: 'วาดสี่เหลี่ยม', line: 'วาดเส้นตรง', polygon: 'วาดหลายเหลี่ยม' };
+            const toolDisplayNames = { select: 'เลือก/ย้ายวัตถุ (Ctrl+C/V คัดลอก/วาง)', pan: 'เลื่อนมุมมอง', scale: 'ตั้งสเกลแปลน', text: 'พิมพ์ข้อความ', count: 'นับจำนวน (คลิกเพื่อปักจุด +1)', circle: 'วาดวงกลม', rectangle: 'วาดสี่เหลี่ยม', line: 'วาดเส้นตรง', polygon: 'วาดหลายเหลี่ยม' };
             if (statusEl) statusEl.innerHTML = `โหมด: ${toolDisplayNames[toolName] || toolName}`;
             if (canvasWrapper) {
                 canvasWrapper.style.cursor = toolName === 'pan' ? 'grab' : toolName === 'select' ? 'default' : 'crosshair';
@@ -1536,8 +2132,8 @@
 
         function saveProjectJSON() {
             const projectData = {
-                version: '8.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
-                autoCalcFromScale, tagPresets, activeTagConfig, placedTags, pagesList
+                version: '12.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
+                autoCalcFromScale, tagPresets, activeTagConfig, placedTags, pagesList, categories
             };
             const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1558,13 +2154,14 @@
                     pageNum = data.pageNum || 1;
                     pixelsPerMeter = data.pixelsPerMeter || 100;
                     autoCalcFromScale = data.autoCalcFromScale !== undefined ? data.autoCalcFromScale : true;
+                    categories = data.categories || categories;
                     tagPresets = data.tagPresets || tagPresets;
                     activeTagConfig = data.activeTagConfig || activeTagConfig;
                     placedTags = data.placedTags || [];
                     pagesList = data.pagesList || [];
                     totalPages = pagesList.length || data.totalPages || 1;
 
-                    updateScaleUIBadges(); renderPresets(); updateActiveTagUI();
+                    renderCategoryDropdowns(); updateScaleUIBadges(); renderPresets(); updateActiveTagUI();
                     await renderPage(pageNum);
                     if (emptyState) emptyState.classList.add('hidden');
                     showToast('เปิดโครงการสำเร็จ', 'success');
@@ -1577,12 +2174,19 @@
             if (placedTags.length === 0) { showToast('ไม่มีข้อมูลสำหรับส่งออก', 'error'); return; }
             const excelRows = [];
             const summaryMap = {};
-            placedTags.forEach(tag => {
+            
+            let filteredTags = placedTags.filter(t => t.shape !== 'text');
+            if (activeCategoryFilter !== 'all') {
+                filteredTags = filteredTags.filter(t => t.category === activeCategoryFilter || pagesList[t.page - 1]?.category === activeCategoryFilter);
+            }
+
+            filteredTags.forEach(tag => {
                 const metrics = computeShapeMetrics(tag);
-                const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
+                const tagCat = tag.category || pagesList[tag.page - 1]?.category || 'ทั่วไป';
+                const key = `${tag.name}_${tag.shape}_${tagCat}_${metrics.w}_${metrics.l}_${metrics.h}`;
                 if (!summaryMap[key]) {
                     summaryMap[key] = {
-                        name: tag.name,
+                        name: tag.name, category: tagCat,
                         shape: tag.shape === 'count' ? 'จุดนับ' : tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
                         w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, totalVolume: 0, count: 0
                     };
@@ -1594,7 +2198,7 @@
 
             Object.values(summaryMap).forEach((item, idx) => {
                 excelRows.push({
-                    'ลำดับ': idx + 1, 'รหัสแท๊ก': item.name, 'รูปทรง': item.shape,
+                    'ลำดับ': idx + 1, 'รหัสแท๊ก': item.name, 'หมวดหมู่งาน': item.category, 'รูปทรง': item.shape,
                     'ความกว้าง (m)': item.w || '-', 'ความยาว (m)': item.l || '-', 'ความสูง (m)': item.h || '-',
                     'พื้นที่รวม (m²)': item.totalArea > 0 ? item.totalArea.toFixed(2) : '-',
                     'ปริมาตรรวม (m³)': item.totalVolume > 0 ? item.totalVolume.toFixed(2) : '-',
@@ -1625,12 +2229,20 @@
             if (!printTableBody) return;
             printTableBody.innerHTML = '';
             const summaryMap = {};
-            placedTags.forEach(tag => {
+
+            let filteredTags = placedTags.filter(t => t.shape !== 'text');
+            if (activeCategoryFilter !== 'all') {
+                filteredTags = filteredTags.filter(t => t.category === activeCategoryFilter || pagesList[t.page - 1]?.category === activeCategoryFilter);
+            }
+
+            filteredTags.forEach(tag => {
                 const metrics = computeShapeMetrics(tag);
-                const key = `${tag.name}_${tag.shape}_${metrics.w}_${metrics.l}_${metrics.h}`;
+                const tagCat = tag.category || pagesList[tag.page - 1]?.category || 'ทั่วไป';
+                const key = `${tag.name}_${tag.shape}_${tagCat}_${metrics.w}_${metrics.l}_${metrics.h}`;
                 if (!summaryMap[key]) {
                     summaryMap[key] = {
-                        name: tag.name, shape: tag.shape === 'count' ? 'จุดนับ' : tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
+                        name: tag.name, category: tagCat,
+                        shape: tag.shape === 'count' ? 'จุดนับ' : tag.shape === 'circle' ? 'วงกลม' : tag.shape === 'rectangle' ? 'สี่เหลี่ยม' : tag.shape === 'polygon' ? 'หลายเหลี่ยม' : 'เส้นตรง',
                         w: metrics.w, l: metrics.l, h: metrics.h, totalArea: 0, totalVolume: 0, count: 0
                     };
                 }
@@ -1654,7 +2266,7 @@
                 tr.innerHTML = `
                     <td class="p-2 border-r border-slate-200 text-center">${idx + 1}</td>
                     <td class="p-2 border-r border-slate-200 font-bold">${item.name}</td>
-                    <td class="p-2 border-r border-slate-200">${item.shape}</td>
+                    <td class="p-2 border-r border-slate-200">${item.category} / ${item.shape}</td>
                     <td class="p-2 border-r border-slate-200 font-mono">${dimStr}</td>
                     <td class="p-2 border-r border-slate-200 text-right font-mono font-bold">${item.totalArea > 0 ? `${item.totalArea.toFixed(2)} m²` : '-'}</td>
                     <td class="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-800">${item.totalVolume > 0 ? `${item.totalVolume.toFixed(2)} m³` : '-'}</td>
@@ -1663,7 +2275,6 @@
                 printTableBody.appendChild(tr);
             });
 
-            // Grand Total Row in Print Modal
             const totalTr = document.createElement('tr');
             totalTr.className = 'bg-slate-100 border-t-2 border-slate-400 font-bold text-slate-900';
             totalTr.innerHTML = `
@@ -1690,14 +2301,37 @@
                 showToast('คลิกลากเส้นบนแบบแปลนตรงระยะที่ทราบค่าจริง เพื่อกำหนดสเกล', 'info');
             });
 
+            document.getElementById('btn-toggle-thumbs')?.addEventListener('click', () => {
+                const sidebar = document.getElementById('thumbs-sidebar');
+                if (sidebar) {
+                    sidebar.classList.toggle('hidden');
+                    showThumbnailsSidebar = !sidebar.classList.contains('hidden');
+                }
+            });
+
             document.getElementById('file-input')?.addEventListener('change', (e) => loadBlueprintFile(e.target.files[0]));
             document.getElementById('empty-file-input')?.addEventListener('change', (e) => loadBlueprintFile(e.target.files[0]));
             document.getElementById('project-file-input')?.addEventListener('change', (e) => loadProjectJSON(e.target.files[0]));
             document.getElementById('empty-project-input')?.addEventListener('change', (e) => loadProjectJSON(e.target.files[0]));
 
             document.getElementById('btn-save-project')?.addEventListener('click', saveProjectJSON);
-            document.getElementById('btn-prev-page')?.addEventListener('click', () => { if (pageNum > 1) renderPage(pageNum - 1); });
-            document.getElementById('btn-next-page')?.addEventListener('click', () => { if (pageNum < totalPages) renderPage(pageNum + 1); });
+
+            document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+                const filteredIndices = getFilteredPagesIndices();
+                const curPos = filteredIndices.indexOf(pageNum - 1);
+                if (curPos > 0) {
+                    renderPage(filteredIndices[curPos - 1] + 1);
+                }
+            });
+
+            document.getElementById('btn-next-page')?.addEventListener('click', () => {
+                const filteredIndices = getFilteredPagesIndices();
+                const curPos = filteredIndices.indexOf(pageNum - 1);
+                if (curPos !== -1 && curPos < filteredIndices.length - 1) {
+                    renderPage(filteredIndices[curPos + 1] + 1);
+                }
+            });
+
             document.getElementById('btn-duplicate-page')?.addEventListener('click', duplicateCurrentPage);
             document.getElementById('btn-delete-page')?.addEventListener('click', deleteCurrentPage);
 
@@ -1708,8 +2342,66 @@
 
             document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
 
+            // Page Category Selector Event
+            document.getElementById('page-category-select')?.addEventListener('change', (e) => {
+                if (pagesList[pageNum - 1]) {
+                    saveHistory();
+                    pagesList[pageNum - 1].category = e.target.value;
+                    updateScaleUIBadges();
+                    updateBOMSummary();
+                    renderThumbnailsSidebar();
+                    triggerAutoSave();
+                    showToast(`เปลี่ยนหมวดหมู่หน้าที่ ${pageNum} เป็น "${e.target.value}"`, 'success');
+                }
+            });
+
+            // Global Category Filter Dropdown Event
+            document.getElementById('global-category-filter')?.addEventListener('change', (e) => {
+                activeCategoryFilter = e.target.value;
+                const filteredIndices = getFilteredPagesIndices();
+                if (filteredIndices.length > 0) {
+                    renderPage(filteredIndices[0] + 1);
+                } else {
+                    showToast(`ไม่พบหน้าแปลนในหมวดหมู่ "${e.target.value}"`, 'error');
+                }
+                updateBOMSummary();
+            });
+
+            // Presets Category Filter Dropdown Event
+            document.getElementById('preset-category-filter')?.addEventListener('change', (e) => {
+                activePresetCategoryFilter = e.target.value;
+                renderPresets();
+            });
+
+            // Category Management Modal Events
+            document.getElementById('btn-manage-categories')?.addEventListener('click', () => {
+                renderCategoryManagerList();
+                document.getElementById('category-modal')?.classList.remove('hidden');
+            });
+            document.getElementById('btn-close-category-modal')?.addEventListener('click', () => {
+                document.getElementById('category-modal')?.classList.add('hidden');
+            });
+            document.getElementById('btn-save-categories-close')?.addEventListener('click', () => {
+                document.getElementById('category-modal')?.classList.add('hidden');
+            });
+            document.getElementById('btn-add-category')?.addEventListener('click', addCategory);
+            document.getElementById('btn-quick-add-cat')?.addEventListener('click', quickAddCategory);
+
+            // Interactive Text Controls Events
+            document.getElementById('btn-text-inc')?.addEventListener('click', () => {
+                const curVal = parseInt(document.getElementById('text-size-input')?.value || 20, 10);
+                updateSelectedTextFontSize(curVal + 4);
+            });
+            document.getElementById('btn-text-dec')?.addEventListener('click', () => {
+                const curVal = parseInt(document.getElementById('text-size-input')?.value || 20, 10);
+                updateSelectedTextFontSize(curVal - 4);
+            });
+            document.getElementById('text-size-input')?.addEventListener('change', (e) => {
+                updateSelectedTextFontSize(parseInt(e.target.value, 10));
+            });
+
             // Input fields sync listeners
-            ['tag-name-input', 'tag-color-input', 'dim-w-input', 'dim-l-input', 'dim-h-input'].forEach(id => {
+            ['tag-name-input', 'tag-color-input', 'tag-category-input', 'dim-w-input', 'dim-l-input', 'dim-h-input'].forEach(id => {
                 document.getElementById(id)?.addEventListener('input', syncActiveTagFromInputs);
             });
             document.getElementById('tag-color-input')?.addEventListener('input', (e) => {
@@ -1725,14 +2417,23 @@
 
             document.getElementById('tab-bom-current')?.addEventListener('click', () => {
                 bomViewScope = 'current';
-                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
-                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
+                document.getElementById('tab-bom-category').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                updateBOMSummary();
+            });
+            document.getElementById('tab-bom-category')?.addEventListener('click', () => {
+                bomViewScope = 'category';
+                document.getElementById('tab-bom-category').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
+                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
                 updateBOMSummary();
             });
             document.getElementById('tab-bom-all')?.addEventListener('click', () => {
                 bomViewScope = 'all';
-                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
-                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-2 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                document.getElementById('tab-bom-all').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200';
+                document.getElementById('tab-bom-current').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
+                document.getElementById('tab-bom-category').className = 'flex-1 py-1 px-1.5 rounded font-medium text-center transition text-slate-600 hover:text-slate-900';
                 updateBOMSummary();
             });
 
@@ -1748,7 +2449,7 @@
             document.getElementById('btn-add-preset')?.addEventListener('click', () => {
                 syncActiveTagFromInputs();
                 let shapeVal = activeTagConfig.shape || activeTool;
-                if (!['count', 'circle', 'rectangle', 'line', 'polygon'].includes(shapeVal)) {
+                if (!['count', 'circle', 'rectangle', 'line', 'polygon', 'text'].includes(shapeVal)) {
                     shapeVal = 'count';
                 }
 
@@ -1757,6 +2458,7 @@
                     name: activeTagConfig.name,
                     shape: shapeVal,
                     color: activeTagConfig.color,
+                    category: activeTagConfig.category || 'ทั่วไป',
                     w: activeTagConfig.w,
                     l: activeTagConfig.l,
                     h: activeTagConfig.h
@@ -1805,7 +2507,7 @@
 
             // Keyboard Shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+C, Ctrl+V, Delete)
             window.addEventListener('keydown', (e) => {
-                const isEditingInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+                const isEditingInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
                 
                 if (e.ctrlKey || e.metaKey) {
                     if (e.key.toLowerCase() === 'z') {
@@ -1827,14 +2529,14 @@
                 if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTagId && !isEditingInput) {
                     saveHistory();
                     placedTags = placedTags.filter(t => t.id !== selectedTagId);
-                    selectedTagId = null; redrawMarkers(); updateBOMSummary(); triggerAutoSave();
+                    selectedTagId = null; updateSelectedObjectInspector(); redrawMarkers(); updateBOMSummary(); triggerAutoSave();
                 }
             });
         }
 
         window.addEventListener('load', async () => {
             setupEventListeners(); updateScaleUIBadges(); updateUndoRedoUI();
-            await initIndexedDB(); renderPresets(); updateActiveTagUI();
+            await initIndexedDB(); renderCategoryDropdowns(); renderPresets(); updateActiveTagUI();
         });
     </script>
 </body>
