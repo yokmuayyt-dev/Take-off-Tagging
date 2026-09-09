@@ -269,7 +269,7 @@
                         <input type="text" id="dim-l-input" value="" placeholder="ยาว (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
                         <input type="text" id="dim-h-input" value="" placeholder="สูง/ลึก (เว้นว่างได้)" class="text-xs border border-slate-300 rounded px-2 py-1 text-center font-mono">
                     </div>
-                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* หากเว้นว่าง ขนาด กว้าง x ยาว จะคำนวณอัตโนมัติเมื่อเปิดสเกล</p>
+                    <p id="dim-calc-hint" class="text-[10px] text-blue-600 font-medium mt-1">* คลิกเลือกมาร์ก แล้วแก้ตัวเลขขนาด เช่น 3.50 ในช่องด้านบนเพื่ออัปเดตสรุป BOM ทันที</p>
                 </div>
 
                 <!-- Text Tool Font Size Inspector -->
@@ -356,14 +356,14 @@
                     <h2 class="text-xs font-bold uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-list-check text-blue-600"></i> ตารางสรุปรายการ BOM
                     </h2>
-                    <p class="text-[11px] text-slate-500">สรุปจำนวนและขนาดแยกรหัสแท๊ก</p>
+                    <p class="text-[11px] text-slate-500">สรุปจำนวน ขนาด พื้นที่ และปริมาตร</p>
                 </div>
                 <button id="btn-clear-all" class="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded transition flex items-center gap-1 font-medium">
                     <i class="fa-solid fa-trash-can"></i> ล้างทั้งหมด
                 </button>
             </div>
 
-            <!-- View Mode Switcher (Current Page vs All Pages vs Category) -->
+            <!-- View Mode Switcher (Current Page vs Category vs All Pages) -->
             <div class="flex border-b border-slate-200 bg-slate-100/80 p-1 text-xs gap-1">
                 <button id="tab-bom-current" class="flex-1 py-1 px-1 rounded font-medium text-center transition bg-white text-blue-700 shadow-sm border border-slate-200 text-[11px]">
                     หน้านี้ (<span id="count-bom-current">0</span>)
@@ -401,6 +401,7 @@
             <div class="border-t border-slate-200 p-3 bg-slate-50 max-h-56 flex flex-col">
                 <h3 class="text-xs font-bold text-slate-600 mb-1.5 flex justify-between items-center">
                     <span><i class="fa-solid fa-layer-group"></i> รายการมาร์ก (<span id="total-items-count">0</span>)</span>
+                    <span class="text-[10px] text-blue-600 font-medium">* คลิกเลือกรายการ แล้วพิมพ์แก้ตัวเลขขนาดได้ทันที</span>
                 </h3>
                 <div id="placed-tags-list" class="flex-1 overflow-y-auto space-y-1 text-xs pr-1"></div>
             </div>
@@ -487,7 +488,7 @@
                                     <th class="p-2 border-r border-slate-300 font-bold">รูปทรง</th>
                                     <th class="p-2 border-r border-slate-300 font-bold">ขนาด (กxยxส)</th>
                                     <th class="p-2 border-r border-slate-300 font-bold text-right">พื้นที่รวม (m²)</th>
-                                    <th class="p-2 border-r border-slate-300 font-bold text-right">ปริมาตรรวม (m³)</th>
+                                    <th class="p-2 border-r border-slate-300 font-bold text-right">ปริมาตร (m³)</th>
                                     <th class="p-2 font-bold text-right">จำนวน</th>
                                 </tr>
                             </thead>
@@ -506,7 +507,7 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        const DB_NAME = 'StructuralBOMDB_V9';
+        const DB_NAME = 'StructuralBOMDB_V11';
         const DB_VERSION = 1;
         const STORE_NAME = 'projectState';
         let db = null;
@@ -844,43 +845,43 @@
             updateTransform();
         }
 
+        // Compute metrics (Width, Length, Height, Area, Perimeter, Volume)
         function computeShapeMetrics(shape) {
             const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : 100;
-            let realW = shape.w !== undefined && shape.w !== '' ? parseFloat(shape.w) : null;
-            let realL = shape.l !== undefined && shape.l !== '' ? parseFloat(shape.l) : null;
-            let realH = shape.h !== undefined && shape.h !== '' ? parseFloat(shape.h) : null;
+            let realW = shape.w !== undefined && shape.w !== '' && !isNaN(parseFloat(shape.w)) ? parseFloat(shape.w) : null;
+            let realL = shape.l !== undefined && shape.l !== '' && !isNaN(parseFloat(shape.l)) ? parseFloat(shape.l) : null;
+            let realH = shape.h !== undefined && shape.h !== '' && !isNaN(parseFloat(shape.h)) ? parseFloat(shape.h) : null;
             let area = 0;
             let perimeter = 0;
             let volume = 0;
 
             if (shape.shape === 'count' || shape.shape === 'text') {
-                if (realW !== null && realL !== null && !isNaN(realW) && !isNaN(realL)) {
+                if (realW !== null && realL !== null) {
                     area = realW * realL;
                 } else {
                     area = 0;
                 }
             } else if (shape.shape === 'circle') {
                 const r = shape.radius || 18;
-                const realR = r / ppm;
-                area = Math.PI * Math.pow(realR, 2);
-                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realW === null)) {
-                    realW = realR * 2;
-                    realL = realR * 2;
+                const drawnR = r / ppm;
+                area = Math.PI * Math.pow(drawnR, 2);
+                if (realW === null) realW = drawnR * 2;
+                if (realL === null) realL = drawnR * 2;
+                if (shape.w !== '' || shape.l !== '') {
+                    area = Math.PI * Math.pow(((realW + realL) / 4), 2);
                 }
             } else if (shape.shape === 'rectangle') {
                 const pxW = Math.abs(shape.x2 - shape.x);
                 const pxH = Math.abs(shape.y2 - shape.y);
-                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realW === null)) {
-                    realW = pxW / ppm;
-                    realL = pxH / ppm;
-                }
-                area = (realW || 0) * (realL || 0);
+                if (realW === null) realW = pxW / ppm;
+                if (realL === null) realL = pxH / ppm;
+                area = realW * realL;
             } else if (shape.shape === 'line') {
                 const lenPx = Math.hypot(shape.x2 - shape.x, shape.y2 - shape.y);
-                if (autoCalcFromScale && (isDrawing || shape.isAutoScaled || realL === null)) {
+                if (realL === null) {
                     realL = lenPx / ppm;
                 }
-                area = (realL || 0) * (realH || 0);
+                area = realL * (realH || 0);
             } else if (shape.shape === 'polygon' && shape.points && shape.points.length > 2) {
                 let pxArea = 0;
                 let pxPerimeter = 0;
@@ -893,15 +894,13 @@
                 }
                 area = Math.abs(pxArea / 2) / (ppm * ppm);
                 perimeter = pxPerimeter / ppm;
-                if (autoCalcFromScale && realW === null) {
-                    realW = Math.sqrt(area);
-                    realL = Math.sqrt(area);
-                }
+                if (realW === null) realW = Math.sqrt(area);
+                if (realL === null) realL = Math.sqrt(area);
             }
 
-            if (realH !== null && !isNaN(realH) && realH > 0) {
+            if (realH !== null && realH > 0) {
                 if (shape.shape === 'line') {
-                    if (realW !== null && !isNaN(realW) && realW > 0) {
+                    if (realW !== null && realW > 0) {
                         volume = realW * (realL || 0) * realH;
                     } else {
                         volume = 0;
@@ -909,16 +908,16 @@
                 } else {
                     if (area > 0) {
                         volume = area * realH;
-                    } else if (realW !== null && realL !== null && !isNaN(realW) && !isNaN(realL)) {
+                    } else if (realW !== null && realL !== null) {
                         volume = realW * realL * realH;
                     }
                 }
             }
 
             return {
-                w: realW !== null && !isNaN(realW) ? realW.toFixed(2) : '',
-                l: realL !== null && !isNaN(realL) ? realL.toFixed(2) : '',
-                h: realH !== null && !isNaN(realH) ? realH.toFixed(2) : '',
+                w: realW !== null ? realW.toFixed(2) : '',
+                l: realL !== null ? realL.toFixed(2) : '',
+                h: realH !== null ? realH.toFixed(2) : '',
                 area: area,
                 perimeter: perimeter.toFixed(2),
                 volume: volume
@@ -1213,7 +1212,6 @@
             if (selectedTagId) {
                 const tag = placedTags.find(t => t.id === selectedTagId);
                 if (tag && tag.shape === 'text') {
-                    saveHistory();
                     tag.fontSize = newSize;
                     redrawMarkers();
                     updateBOMSummary();
@@ -1245,7 +1243,6 @@
             if (selectedTagId) {
                 const tag = placedTags.find(t => t.id === selectedTagId);
                 if (tag) {
-                    saveHistory();
                     tag.color = activeTagConfig.color;
                     tag.category = activeTagConfig.category;
                     if (tag.shape !== 'text') {
@@ -1369,7 +1366,7 @@
                 ctx.arc(tag.x, tag.y, r, 0, 2 * Math.PI);
                 ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1.0; ctx.stroke();
                 
-                const labelText = `${tag.name}`;
+                const labelText = `${tag.name}${tag.shape !== 'count' && metrics.area > 0 ? ` (${metrics.area.toFixed(2)} m²)` : ''}`;
                 ctx.font = 'bold 12px Prompt, sans-serif';
                 const textWidth = ctx.measureText(labelText).width;
                 ctx.fillStyle = tag.color;
@@ -1670,7 +1667,8 @@
             isDrawing = false;
             if (autoCalcFromScale && tempShape.shape !== 'polygon' && tempShape.shape !== 'count' && tempShape.shape !== 'text') {
                 const metrics = computeShapeMetrics(tempShape);
-                tempShape.w = metrics.w; tempShape.l = metrics.l;
+                if (!tempShape.w) tempShape.w = metrics.w;
+                if (!tempShape.l) tempShape.l = metrics.l;
             }
             placedTags.push({ ...tempShape });
             selectedTagId = tempShape.id;
@@ -1769,22 +1767,25 @@
             `;
             tableBody.appendChild(totalTr);
 
+            // Render Placed Tags Detail Items in Right Sidebar
             tagsToDisplay.forEach((tag, idx) => {
                 const metrics = computeShapeMetrics(tag);
                 const itemDiv = document.createElement('div');
-                itemDiv.className = `flex items-center justify-between p-1.5 rounded text-xs border ${tag.id === selectedTagId ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-200'} cursor-pointer`;
-                const infoParts = [`หน้า ${tag.page}`];
-                if (tag.shape === 'text') infoParts.push('ข้อความ');
-                else {
-                    if (metrics.area > 0) infoParts.push(`${metrics.area.toFixed(2)} m²`);
-                    if (metrics.volume > 0) infoParts.push(`${metrics.volume.toFixed(2)} m³`);
+                itemDiv.className = `flex items-center justify-between p-1.5 rounded text-xs border ${tag.id === selectedTagId ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400' : 'bg-white border-slate-200 hover:border-slate-300'} cursor-pointer transition`;
+                
+                let dimDisplay = '';
+                if (tag.shape === 'text') {
+                    dimDisplay = `ข้อความ: "${tag.text || tag.name}"`;
+                } else {
+                    const dimStr = formatDimensionDisplay(metrics.w, metrics.l, metrics.h);
+                    dimDisplay = dimStr !== '-' ? `${dimStr}m` : (metrics.area > 0 ? `${metrics.area.toFixed(2)} m²` : '-');
                 }
 
                 itemDiv.innerHTML = `
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
-                        <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.name || 'ข้อความ'}</span>
-                        <span class="text-[10px] text-slate-500 truncate">(${infoParts.join(' - ')})</span>
+                        <span class="font-bold text-slate-800 shrink-0">#${idx + 1} ${tag.name || 'มาร์ก'}</span>
+                        <span class="text-[11px] text-slate-600 font-mono truncate">หน้า ${tag.page} - ${dimDisplay}</span>
                     </div>
                     <button class="btn-del-tag text-red-500 hover:text-red-700 px-1" data-id="${tag.id}"><i class="fa-solid fa-xmark"></i></button>
                 `;
@@ -1898,7 +1899,7 @@
 
         function saveProjectJSON() {
             const projectData = {
-                version: '9.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
+                version: '11.0', activeFileName, pageNum, totalPages, pixelsPerMeter,
                 autoCalcFromScale, tagPresets, activeTagConfig, placedTags, pagesList, categoriesList
             };
             const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
@@ -2143,7 +2144,7 @@
                 autoCalcFromScale = e.target.checked;
                 const dimHint = document.getElementById('dim-calc-hint');
                 if (dimHint) {
-                    dimHint.textContent = autoCalcFromScale ? '* หากเว้นว่าง ขนาด กว้าง x ยาว จะคำนวณอัตโนมัติเมื่อเปิดสเกล' : '* โหมดกำหนดขนาดเองจากตัวเลขด้านบน';
+                    dimHint.textContent = autoCalcFromScale ? '* คลิกเลือกมาร์ก แล้วแก้ตัวเลขขนาด เช่น 3.50 ในช่องด้านบนเพื่ออัปเดตสรุป BOM ทันที' : '* โหมดกำหนดขนาดเองจากตัวเลขด้านบน';
                 }
             });
 
