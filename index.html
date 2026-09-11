@@ -1069,20 +1069,49 @@
             const reader = new FileReader();
             if (file.type === 'application/pdf') {
                 reader.onload = async function (e) {
-                    const arrayBuffer = e.target.result;
-                    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
-                    totalPages = pdfDoc.numPages;
-                    
-                    pagesList = [];
-                    for (let i = 1; i <= totalPages; i++) {
-                        pagesList.push({ pdfPageIndex: i, dataUrl: null, category: 'ทั่วไป' });
-                    }
+                    try {
+                        showToast('กำลังเปิดไฟล์ PDF และเตรียมประมวลผล...', 'info');
+                        const arrayBuffer = e.target.result;
+                        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                        totalPages = pdfDoc.numPages;
+                        
+                        pagesList = [];
+                        
+                        // Dedicated offscreen canvas for rendering all pages systematically
+                        const offscreenCanvas = document.createElement('canvas');
+                        const offscreenCtx = offscreenCanvas.getContext('2d');
 
-                    await renderPage(1);
-                    renderThumbnails();
-                    if (emptyState) emptyState.classList.add('hidden');
-                    triggerAutoSave();
-                    showToast(`โหลดแบบแปลน PDF สำเร็จ (${totalPages} หน้า)`, 'success');
+                        for (let i = 1; i <= totalPages; i++) {
+                            showToast(`กำลังประมวลผล PDF หน้า ${i} จาก ${totalPages}...`, 'info');
+                            let pageDataUrl = null;
+                            try {
+                                const page = await pdfDoc.getPage(i);
+                                const viewport = page.getViewport({ scale: 2.0 });
+                                offscreenCanvas.width = viewport.width;
+                                offscreenCanvas.height = viewport.height;
+                                const renderTask = page.render({ canvasContext: offscreenCtx, viewport: viewport });
+                                await renderTask.promise;
+                                pageDataUrl = offscreenCanvas.toDataURL('image/png');
+                            } catch (pErr) {
+                                console.warn(`Error rendering PDF page ${i}:`, pErr);
+                            }
+
+                            pagesList.push({
+                                pdfPageIndex: i,
+                                dataUrl: pageDataUrl,
+                                category: 'ทั่วไป'
+                            });
+                        }
+
+                        await renderPage(1);
+                        renderThumbnails();
+                        if (emptyState) emptyState.classList.add('hidden');
+                        triggerAutoSave();
+                        showToast(`โหลดแบบแปลน PDF สำเร็จครบทั้ง ${totalPages} หน้า`, 'success');
+                    } catch (err) {
+                        console.error("PDF Read Error:", err);
+                        showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ PDF', 'error');
+                    }
                 };
                 reader.readAsArrayBuffer(file);
             } else if (file.type.startsWith('image/')) {
